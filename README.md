@@ -12,12 +12,15 @@ The first bridge shipped here is **English → French**, where the head start is
 
 ## How it works
 
-- A curriculum of ordered **constructions** (`data/constructions.json`) — building blocks like *c'est + [word you already know]*, each defined by a goal, a transfer hook from the known language, a target pattern, and pitfalls to watch for. Each is a scaffold for a live conversation, not a script.
-- A tutor prompt (`data/tutor-prompt.md`) that enforces the method: one guiding question per turn, respond to the learner's actual answer, never lecture, never hand over the solution.
-- When you produce a construction's target correctly on your own, the lesson advances automatically.
+The design principle: **code owns the curriculum, memory, and scheduling; the model owns only the conversation.**
 
-- Every word you produce correctly is banked in a **word bank** (★ counter in the header) with its meaning, and your lesson progress is remembered — both live in your browser (localStorage), so there are no accounts and no server database. Coming back later resumes where you left off; **Start over** wipes the slate.
-- The tutor **tests you constantly**: each lesson opens with a rapid warm-up on your least-recently-practiced words, and every few turns it weaves in another quick recall check. Producing a word again refreshes its place in the queue — lightweight spaced repetition, by conversation instead of flashcards.
+- A **syllabus graph** of 48 constructions (`data/constructions.json`) — building blocks like *c'est + [word you already know]* through *je voudrais*, both past tenses, pronouns, and a narration capstone. Each node declares prerequisites; a lesson unlocks when its prereqs are mastered. Nodes c13+ are machine-authored in the Thinking-Method spirit and should be verified by a fluent speaker.
+- A **learner model** (`.data/learner.json`, server-side, gitignored) — every word you've produced with its meaning, a memory half-life that grows with each successful recall and collapses on a miss (spaced repetition, exponential-forgetting model), plus a log of your characteristic error patterns (gender, "to"-insertion, word order…).
+- A **session planner** that assembles each request: due review words, the current unlocked construction, and your recurring errors to watch for. The tutor opens lessons with warm-up quizzes, re-tests something every few turns, and every 5 mastered constructions runs a **checkpoint** — 5 rapid challenges, no hints, scored and recorded.
+- The tutor's replies are **structured output** (typed JSON, not free text): the conversational reply plus machine-readable observations — words produced, review misses, error tags, mastery, and a pronunciation rating. No fragile control tokens.
+- **Pronunciation is scored by sound, not spelling.** Spoken answers are judged phonetically — saying *c'est* that gets transcribed "s'est" is correct pronunciation, and each voice answer gets a 🗣 clear/close/unclear badge with a coaching note.
+- **📖 Story mode** generates a micro-story almost entirely from words you already own (~95% comprehensible input), spoken aloud, with tap-to-reveal translations and comprehension questions.
+- **📄 Coverage tool**: paste any real French text and see it color-coded — words you've produced, instant cognates, genuinely new — with a % readable score. When the percentage gets high, you're ready for real content.
 
 ## Setup
 

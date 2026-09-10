@@ -9,6 +9,7 @@ export type Construction = {
   targetPattern: string;
   examples: string[];
   watchFor: string;
+  prereqs?: string[];
 };
 
 type Curriculum = { language: { from: string; to: string }; note?: string; constructions: Construction[] };

@@ -1,6 +1,6 @@
 {
   "language": { "from": "en", "to": "fr" },
-  "note": "Ordered curriculum for a Thinking-Method tutor (English speaker learning French). Each node is a scaffold, not a script: the tutor uses these fields to run a live Socratic exchange. Built in the spirit of the method, not copied from any course.",
+  "note": "Ordered curriculum graph for a Thinking-Method tutor (English speaker learning French). Each node is a scaffold, not a script: the tutor uses these fields to run a live Socratic exchange. prereqs list node ids that must be mastered before a node unlocks. Nodes c01-c12 are the original hand-checked core; c13+ are machine-authored in the same spirit and pending fluent-speaker verification. Built in the spirit of the method, not copied from any course.",
   "constructions": [
     {
       "id": "c01-cognates",
@@ -9,7 +9,8 @@
       "transferHook": "English '-tion' nouns are spelled the same in French (information, nation, situation, direction); '-able/-ible' and '-ent/-ant' words too (possible, important, différent). Only the pronunciation changes.",
       "targetPattern": "Recognize and attempt to pronounce cognate nouns and adjectives.",
       "examples": ["information", "situation", "possible", "important", "différent"],
-      "watchFor": "This node is about realization and pronunciation, not making sentences yet. The win is the learner feeling how much they already have."
+      "watchFor": "This node is about realization and pronunciation, not making sentences yet. The win is the learner feeling how much they already have.",
+      "prereqs": []
     },
     {
       "id": "c02-cest",
@@ -18,7 +19,8 @@
       "transferHook": "'c'est' ≈ 'it's / that's / this is'. Bolt it onto a word they already own.",
       "targetPattern": "c'est + [cognate adjective/noun]",
       "examples": ["c'est possible", "c'est important", "c'est une situation difficile"],
-      "watchFor": "Keep it to c'est + one word at first. Let them build up, don't hand them long sentences."
+      "watchFor": "Keep it to c'est + one word at first. Let them build up, don't hand them long sentences.",
+      "prereqs": ["c01-cognates"]
     },
     {
       "id": "c03-negation",
@@ -27,7 +29,8 @@
       "transferHook": "'pas' ≈ 'not'. Formally French wraps the verb (ne ... pas), but in speech people drop the 'ne': 'c'est pas possible'.",
       "targetPattern": "c'est pas + X   (formal: ce n'est pas + X)",
       "examples": ["c'est pas possible", "ce n'est pas important"],
-      "watchFor": "Let them discover where 'pas' sits. Introduce the full ne...pas only after the spoken form lands."
+      "watchFor": "Let them discover where 'pas' sits. Introduce the full ne...pas only after the spoken form lands.",
+      "prereqs": ["c02-cest"]
     },
     {
       "id": "c04-je-veux-inf",
@@ -36,7 +39,8 @@
       "transferHook": "Many French verbs end in '-er' and are cousins of English ones: préparer, organiser, continuer, décider, arriver. 'je veux' ≈ 'I want'.",
       "targetPattern": "je veux + [infinitive]",
       "examples": ["je veux continuer", "je veux organiser", "je veux décider"],
-      "watchFor": "This is the big unlock — let them feel that one pattern + many cognate verbs = many sentences."
+      "watchFor": "This is the big unlock — let them feel that one pattern + many cognate verbs = many sentences.",
+      "prereqs": ["c02-cest"]
     },
     {
       "id": "c05-no-to",
@@ -45,7 +49,8 @@
       "transferHook": "English says 'I want TO continue'; French just says 'je veux continuer' — nothing stands in for 'to'.",
       "targetPattern": "Reinforce c04 with no inserted word between veux and the verb.",
       "examples": ["je veux continuer", "je veux préparer"],
-      "watchFor": "The classic beginner error is inserting 'à' or a word for 'to'. Guide them to leave the gap empty; don't just correct it."
+      "watchFor": "The classic beginner error is inserting 'à' or a word for 'to'. Guide them to leave the gap empty; don't just correct it.",
+      "prereqs": ["c04-je-veux-inf"]
     },
     {
       "id": "c06-je-peux",
@@ -54,7 +59,8 @@
       "transferHook": "'je peux' ≈ 'I can'. Same shape as 'je veux': modal + bare infinitive.",
       "targetPattern": "je peux + [infinitive]",
       "examples": ["je peux organiser", "je peux continuer"],
-      "watchFor": "Same no-'to' rule as c05. Let them notice the pattern is identical."
+      "watchFor": "Same no-'to' rule as c05. Let them notice the pattern is identical.",
+      "prereqs": ["c05-no-to"]
     },
     {
       "id": "c07-je-vais-futur",
@@ -63,7 +69,8 @@
       "transferHook": "French uses 'aller' (to go) + a verb exactly like English 'going to': 'je vais préparer' = 'I'm going to prepare'.",
       "targetPattern": "je vais + [infinitive]",
       "examples": ["je vais préparer", "je vais organiser"],
-      "watchFor": "Distinguish from literal 'I go to a place'. Here it's future, same as English 'going to'."
+      "watchFor": "Distinguish from literal 'I go to a place'. Here it's future, same as English 'going to'.",
+      "prereqs": ["c06-je-peux"]
     },
     {
       "id": "c08-questions",
@@ -72,7 +79,8 @@
       "transferHook": "Easiest question = say the statement with a rising tone, or put 'est-ce que' in front.",
       "targetPattern": "[statement]?  /  est-ce que + [statement]",
       "examples": ["tu veux continuer ?", "est-ce que tu peux organiser ?"],
-      "watchFor": "Do not introduce inversion yet. Keep it to intonation and est-ce que."
+      "watchFor": "Do not introduce inversion yet. Keep it to intonation and est-ce que.",
+      "prereqs": ["c07-je-vais-futur"]
     },
     {
       "id": "c09-subjects",
@@ -81,7 +89,8 @@
       "transferHook": "'je veux' → 'tu veux' (you) → 'on peut' (we, in speech). Small, controlled steps.",
       "targetPattern": "tu / on + verb form",
       "examples": ["tu veux", "on peut", "on va continuer"],
-      "watchFor": "Introduce one subject at a time. Don't dump a conjugation table."
+      "watchFor": "Introduce one subject at a time. Don't dump a conjugation table.",
+      "prereqs": ["c08-questions"]
     },
     {
       "id": "c10-object-pronoun",
@@ -90,7 +99,8 @@
       "transferHook": "English 'do it' puts 'it' after. French 'le faire' puts it before: 'je veux le faire' = 'I want to do it'.",
       "targetPattern": "je veux / peux + le/la + [infinitive]",
       "examples": ["je veux le faire", "je peux le préparer"],
-      "watchFor": "The word order flip is the whole lesson. Let them place the pronoun themselves and feel where it goes."
+      "watchFor": "The word order flip is the whole lesson. Let them place the pronoun themselves and feel where it goes.",
+      "prereqs": ["c09-subjects"]
     },
     {
       "id": "c11-connectors",
@@ -99,7 +109,8 @@
       "transferHook": "'mais' (but), 'parce que' (because), 'avec' (with) let them chain what they can already say.",
       "targetPattern": "[clause] + connector + [clause]",
       "examples": ["je veux continuer mais c'est difficile", "je peux le faire parce que c'est possible"],
-      "watchFor": "Reward longer sentences built only from pieces they already own."
+      "watchFor": "Reward longer sentences built only from pieces they already own.",
+      "prereqs": ["c10-object-pronoun"]
     },
     {
       "id": "c12-passe-compose",
@@ -108,7 +119,368 @@
       "transferHook": "'j'ai' = 'I have'; '-er' verbs become '-é'. So 'j'ai préparé' ≈ 'I have prepared / I prepared'. Mirrors English 'have + -ed'.",
       "targetPattern": "j'ai + [past participle in -é]",
       "examples": ["j'ai préparé", "j'ai organisé", "j'ai décidé"],
-      "watchFor": "Two things land here (j'ai + the -é ending). Introduce the -é first, then attach j'ai. One step at a time."
+      "watchFor": "Two things land here (j'ai + the -é ending). Introduce the -é first, then attach j'ai. One step at a time.",
+      "prereqs": ["c11-connectors"]
+    },
+    {
+      "id": "c13-il-faut",
+      "title": "You have to → il faut + verb",
+      "goal": "Express necessity with one frozen chunk plus any infinitive.",
+      "transferHook": "'il faut' is one unchanging chunk ≈ 'it's necessary / you have to'. Same modal machine as je veux/je peux: chunk + bare infinitive, no 'to'.",
+      "targetPattern": "il faut + [infinitive]",
+      "examples": ["il faut continuer", "il faut décider", "il faut pas paniquer"],
+      "watchFor": "Learners try to conjugate it or add a subject like 'tu'. It never changes — that's the gift.",
+      "prereqs": ["c06-je-peux"]
+    },
+    {
+      "id": "c14-je-voudrais",
+      "title": "I'd like → je voudrais",
+      "goal": "Sound polite with a single new form of a known verb.",
+      "transferHook": "English softens 'I want' to 'I'd like'; French softens 'je veux' to 'je voudrais'. Same slot, same no-'to' rule.",
+      "targetPattern": "je voudrais + [infinitive / noun]",
+      "examples": ["je voudrais continuer", "je voudrais un café"],
+      "watchFor": "Don't explain the conditional yet — treat 'je voudrais' as a polite chunk. The system comes later (c44).",
+      "prereqs": ["c04-je-veux-inf"]
+    },
+    {
+      "id": "c15-ne-pas-full",
+      "title": "The formal not → ne ... pas",
+      "goal": "Upgrade spoken negation to the written/formal sandwich.",
+      "transferHook": "They already use 'pas' (c03). Writing and careful speech wrap the verb: 'je ne veux pas'. English has nothing like the sandwich — feel it as a frame around the verb.",
+      "targetPattern": "[subject] + ne + [verb] + pas",
+      "examples": ["je ne veux pas continuer", "ce n'est pas possible"],
+      "watchFor": "Before a vowel 'ne' becomes n' (n'est). Let them hear that it's the same sentence they already say, dressed up.",
+      "prereqs": ["c03-negation", "c09-subjects"]
+    },
+    {
+      "id": "c16-jaime",
+      "title": "I like → j'aime + verb or noun",
+      "goal": "Talk about likes with one verb and everything they own.",
+      "transferHook": "'j'aime' ≈ 'I like/love'. Like English, it takes a verb ('I like to organize') or a noun — but with no 'to': 'j'aime organiser'.",
+      "targetPattern": "j'aime + [infinitive]  /  j'aime + le/la/les + [noun]",
+      "examples": ["j'aime organiser", "j'aime le café", "j'aime pas ça"],
+      "watchFor": "With nouns French demands le/la/les where English drops the article ('I like coffee' → 'j'aime LE café'). Let them discover the needed article.",
+      "prereqs": ["c05-no-to"]
+    },
+    {
+      "id": "c17-je-dois",
+      "title": "I must → je dois + verb",
+      "goal": "Complete the modal family: want, can, must.",
+      "transferHook": "'je dois' ≈ 'I must / I have to'. Third member of the modal machine — identical shape to je veux and je peux.",
+      "targetPattern": "je dois + [infinitive]",
+      "examples": ["je dois préparer", "je dois le faire", "tu dois décider"],
+      "watchFor": "Contrast with 'il faut' (impersonal) — 'je dois' is personal. Let them feel the difference by asking who has to do it.",
+      "prereqs": ["c13-il-faut"]
+    },
+    {
+      "id": "c18-third-person",
+      "title": "He wants, she can → il veut, elle peut",
+      "goal": "Talk about other people with tiny sound changes.",
+      "transferHook": "je veux → il/elle veut, je peux → il/elle peut: the written ending changes but the SOUND barely does. French conjugation is easier on the ear than on the page.",
+      "targetPattern": "il / elle + veut / peut / va / doit + [infinitive]",
+      "examples": ["il veut continuer", "elle peut le faire", "elle va décider"],
+      "watchFor": "One subject at a time, sound first, spelling second. Don't open a conjugation table.",
+      "prereqs": ["c09-subjects"]
+    },
+    {
+      "id": "c19-nous-vous",
+      "title": "We and formal you → nous, vous",
+      "goal": "Complete the persons: nous ...-ons, vous ...-ez.",
+      "transferHook": "Two reliable machine rules: nous → verb ends in '-ons' (nous allons), vous → '-ez' (vous voulez). 'vous' doubles as the polite 'you' — like addressing someone as 'Sir'.",
+      "targetPattern": "nous + [verb]-ons  /  vous + [verb]-ez",
+      "examples": ["nous allons continuer", "vous voulez un café ?", "vous pouvez décider"],
+      "watchFor": "Speech prefers 'on' for we (they know it from c09) — nous is for writing and emphasis. Teach vous as the stranger-safe you.",
+      "prereqs": ["c18-third-person"]
+    },
+    {
+      "id": "c20-quest-ce-que",
+      "title": "What → qu'est-ce que",
+      "goal": "Ask open 'what' questions with one memorized key.",
+      "transferHook": "'qu'est-ce que' is a frozen chunk ≈ 'what'. Sounds like 'kess-kuh'. Then attach any statement they already own: 'qu'est-ce que tu veux ?'",
+      "targetPattern": "qu'est-ce que + [subject + verb]",
+      "examples": ["qu'est-ce que tu veux ?", "qu'est-ce que tu vas faire ?", "qu'est-ce que c'est ?"],
+      "watchFor": "Don't dissect the chunk's inner grammar — it's a key, not a sentence. 'qu'est-ce que c'est ?' = 'what is it?' is worth memorizing whole.",
+      "prereqs": ["c08-questions"]
+    },
+    {
+      "id": "c21-pourquoi",
+      "title": "Why / because → pourquoi / parce que",
+      "goal": "Ask for reasons and give them.",
+      "transferHook": "'pourquoi ?' ≈ 'why?', and they already own 'parce que' (c11). Question and answer form a natural pair.",
+      "targetPattern": "pourquoi + [statement]?  → parce que + [clause]",
+      "examples": ["pourquoi tu veux partir ?", "parce que c'est important"],
+      "watchFor": "Spoken French happily says 'pourquoi tu veux...' without inversion. Keep it conversational.",
+      "prereqs": ["c20-quest-ce-que"]
+    },
+    {
+      "id": "c22-ou-quand",
+      "title": "Where and when → où, quand",
+      "goal": "Complete the everyday question words.",
+      "transferHook": "'où' (where) and 'quand' (when) drop into the same slot as pourquoi: question word + the statement they already own.",
+      "targetPattern": "où / quand + [statement]?",
+      "examples": ["où tu vas ?", "quand est-ce que tu veux commencer ?"],
+      "watchFor": "'où' vs 'ou' (or) differ by one accent — flag it lightly when writing, ignore in speech.",
+      "prereqs": ["c21-pourquoi"]
+    },
+    {
+      "id": "c23-il-y-a",
+      "title": "There is / there are → il y a",
+      "goal": "Describe what exists with one all-purpose chunk.",
+      "transferHook": "'il y a' is one frozen chunk ≈ 'there is / there are' — no singular/plural change, unlike English.",
+      "targetPattern": "il y a + [noun]  /  il n'y a pas de + [noun]",
+      "examples": ["il y a un problème", "il y a une solution", "il n'y a pas de problème"],
+      "watchFor": "The negative flips the article to 'de' ('pas de problème'). Let them meet that as a fixed pattern, not a rule lecture.",
+      "prereqs": ["c15-ne-pas-full"]
+    },
+    {
+      "id": "c24-gender-adjectives",
+      "title": "Un/une and the shape of adjectives",
+      "goal": "Meet gender agreement without fear: articles first, endings second.",
+      "transferHook": "English has 'a'; French splits it: un/une. Many adjectives just add an 'e' for feminine — often changing only the sound's ending (important → importante: the 't' wakes up).",
+      "targetPattern": "un/une + [noun] + [adjective (+e)]",
+      "examples": ["un projet important", "une situation importante", "une décision difficile"],
+      "watchFor": "Don't demand memorized genders — give the noun's gender away free and let them shape the adjective. Sound the final consonant appearing.",
+      "prereqs": ["c11-connectors"]
+    },
+    {
+      "id": "c25-past-irregulars",
+      "title": "Done, said, seen → fait, dit, vu",
+      "goal": "Extend the past to the most common irregular participles.",
+      "transferHook": "English also has irregular pasts (do→done, say→said, see→seen). French's big three: fait (done), dit (said), vu (seen) — short, punchy, everywhere.",
+      "targetPattern": "j'ai + fait / dit / vu / pris + [rest]",
+      "examples": ["j'ai fait ça", "j'ai dit non", "j'ai vu le problème", "j'ai pris un café"],
+      "watchFor": "Only these few forms — resist listing more. Each is a single syllable to own for life.",
+      "prereqs": ["c12-passe-compose"]
+    },
+    {
+      "id": "c26-etre-past",
+      "title": "I went → je suis allé",
+      "goal": "Meet the second past auxiliary: movement verbs take être.",
+      "transferHook": "Old English did this too ('he is come'). A small club of going/coming verbs uses 'je suis' instead of 'j'ai': je suis allé (I went), je suis arrivé, je suis parti.",
+      "targetPattern": "je suis + allé / arrivé / parti / venu",
+      "examples": ["je suis allé au café", "elle est arrivée", "on est partis"],
+      "watchFor": "Keep the club tiny (aller, arriver, partir, venir). Agreement (-e, -s) is a spelling matter — mention only if they write.",
+      "prereqs": ["c25-past-irregulars"]
+    },
+    {
+      "id": "c27-cetait",
+      "title": "It was → c'était",
+      "goal": "Describe the past (background) versus events.",
+      "transferHook": "They own 'c'est'; the past-description version is 'c'était' ≈ 'it was'. Pair: 'c'était difficile, mais j'ai continué' — was-ness vs happened-ness, just like English.",
+      "targetPattern": "c'était + [adjective]  /  il y avait + [noun]",
+      "examples": ["c'était important", "c'était pas possible", "il y avait un problème"],
+      "watchFor": "Don't teach the imparfait system — just these two chunks (c'était, il y avait) as past scenery.",
+      "prereqs": ["c25-past-irregulars", "c23-il-y-a"]
+    },
+    {
+      "id": "c28-possessives",
+      "title": "My, your → mon/ma, ton/ta",
+      "goal": "Claim things: possessives that agree with the thing, not the owner.",
+      "transferHook": "Key flip from English: 'sa décision' can be his OR her decision — the word matches the NOUN's gender, not the owner's. mon/ma/mes work like a/une: mon projet, ma situation.",
+      "targetPattern": "mon/ma/mes, ton/ta/tes, son/sa/ses + [noun]",
+      "examples": ["mon projet", "ma décision", "c'est ton problème", "sa situation est difficile"],
+      "watchFor": "The owner-vs-thing flip is the entire lesson. Test it with 'his decision' → 'sa décision'.",
+      "prereqs": ["c24-gender-adjectives"]
+    },
+    {
+      "id": "c29-demonstratives",
+      "title": "This, that → ce, cette, ces",
+      "goal": "Point at things with the ce family.",
+      "transferHook": "They already say 'c'est' — 'ce' is hiding inside it. ce projet (masc), cette situation (fem), ces idées (plural): one word, three shapes, same job as this/that.",
+      "targetPattern": "ce / cette / ces + [noun]",
+      "examples": ["ce projet est important", "cette situation est difficile", "j'aime ces idées"],
+      "watchFor": "French doesn't split this/that — 'ce' covers both. Don't let them hunt for a 'that' word.",
+      "prereqs": ["c28-possessives"]
+    },
+    {
+      "id": "c30-me-te",
+      "title": "Me and you before the verb → me, te",
+      "goal": "Extend the pronoun-first rule from things to people.",
+      "transferHook": "Same flip they met in 'le faire' (c10): 'tu ME comprends' = 'you understand ME' — the me jumps in front of the verb.",
+      "targetPattern": "[subject] + me/te + [verb]",
+      "examples": ["tu me comprends ?", "je te comprends", "elle me connaît"],
+      "watchFor": "Word order is the whole lesson again. Build from 'tu comprends' → insert 'me'.",
+      "prereqs": ["c10-object-pronoun"]
+    },
+    {
+      "id": "c31-y",
+      "title": "There → y (j'y vais)",
+      "goal": "Replace places with one letter.",
+      "transferHook": "'y' ≈ 'there', and like all French pronouns it goes BEFORE the verb: 'j'y vais' = 'I'm going (there)'. English drops 'there'; French insists on the little y.",
+      "targetPattern": "[subject] + y + [verb]",
+      "examples": ["j'y vais", "on y va ?", "je veux y aller"],
+      "watchFor": "'on y va' is the everyday 'let's go' — worth owning as a chunk. With modals the y sticks to the infinitive: 'je veux y aller'.",
+      "prereqs": ["c30-me-te"]
+    },
+    {
+      "id": "c32-en-pronoun",
+      "title": "Some of it → en (j'en veux)",
+      "goal": "Replace quantities with en.",
+      "transferHook": "'en' ≈ 'of it / some': 'j'en veux' = 'I want some'. English can drop it ('I want some'); French makes it a pre-verb pronoun like y and me.",
+      "targetPattern": "[subject] + en + [verb]",
+      "examples": ["j'en veux", "j'en ai deux", "il y en a"],
+      "watchFor": "Keep to frozen high-value chunks (j'en veux, il y en a). The full en-replacement rule can wait.",
+      "prereqs": ["c31-y"]
+    },
+    {
+      "id": "c33-reflexives",
+      "title": "Myself → je me prépare",
+      "goal": "Meet reflexive verbs as the me-rule turned on oneself.",
+      "transferHook": "They know 'me' before the verb (c30). Point it at yourself: 'je me prépare' = 'I get (myself) ready'. English hides the myself; French says it.",
+      "targetPattern": "je me + [verb]  /  tu te + [verb]",
+      "examples": ["je me prépare", "je m'appelle...", "tu te rappelles ?"],
+      "watchFor": "'je m'appelle' (my name is) is the flagship — let them decode it as 'I call myself'.",
+      "prereqs": ["c30-me-te"]
+    },
+    {
+      "id": "c34-comparisons",
+      "title": "More ... than → plus ... que",
+      "goal": "Compare anything with two little words.",
+      "transferHook": "English needs '-er' or 'more'; French always uses 'plus': plus important que = more important than. One rule, no exceptions to start.",
+      "targetPattern": "plus / moins + [adjective] + que + [X]",
+      "examples": ["c'est plus important que ça", "c'est moins difficile que ça", "elle est plus organisée que moi"],
+      "watchFor": "Warn gently that 'plus' here sounds 'plü' (the s sleeps). 'moins' = less gives them the other direction free.",
+      "prereqs": ["c24-gender-adjectives"]
+    },
+    {
+      "id": "c35-quantities",
+      "title": "A lot of → beaucoup de",
+      "goal": "Quantify with the de-family.",
+      "transferHook": "All French quantity words end in 'de': beaucoup de (a lot of), un peu de (a bit of), trop de (too much). The 'de' never changes — easier than English's much/many split.",
+      "targetPattern": "beaucoup / un peu / trop + de + [noun]",
+      "examples": ["beaucoup de travail", "un peu de temps", "trop de questions"],
+      "watchFor": "No article after de ('beaucoup de travail', never 'beaucoup du travail'). Let them hear the clean pattern.",
+      "prereqs": ["c23-il-y-a"]
+    },
+    {
+      "id": "c36-time-words",
+      "title": "Yesterday, today, tomorrow → hier, aujourd'hui, demain",
+      "goal": "Anchor tenses to time words they can reuse everywhere.",
+      "transferHook": "Three words unlock time-travel with grammar they own: hier + j'ai fait (past), aujourd'hui + je fais, demain + je vais faire (future). English works identically.",
+      "targetPattern": "hier / aujourd'hui / demain + [owned tense]",
+      "examples": ["hier j'ai travaillé", "aujourd'hui je peux continuer", "demain je vais décider"],
+      "watchFor": "This node is assembly, not new grammar — reward long correct sentences mixing tense and time word.",
+      "prereqs": ["c26-etre-past", "c07-je-vais-futur"]
+    },
+    {
+      "id": "c37-si-clauses",
+      "title": "If you want → si tu veux",
+      "goal": "Make offers and conditions with si + present.",
+      "transferHook": "'si' = 'if', and beginner French conditions use plain present on both sides: 'si tu veux, on peut continuer' — exactly like English 'if you want, we can continue'.",
+      "targetPattern": "si + [present clause], + [present/future clause]",
+      "examples": ["si tu veux, on peut continuer", "si c'est possible, je vais le faire"],
+      "watchFor": "'si' + 'il' contracts to s'il (s'il te plaît hides here!). No conditional mood yet — present + present is fully correct.",
+      "prereqs": ["c11-connectors", "c09-subjects"]
+    },
+    {
+      "id": "c38-relative-que",
+      "title": "The thing that I want → la chose que je veux",
+      "goal": "Glue a mini-sentence onto a noun with que.",
+      "transferHook": "English: 'the thing (that) I want' — that is optional. French 'que' is mandatory but works the same: 'la chose que je veux'. qui = who/that (subject side).",
+      "targetPattern": "[noun] + que/qui + [clause]",
+      "examples": ["c'est la chose que je veux", "la personne qui organise", "c'est ce que je veux"],
+      "watchFor": "'ce que' = 'what' in the middle of a sentence ('c'est ce que je veux' = that's what I want) — a high-value chunk.",
+      "prereqs": ["c20-quest-ce-que"]
+    },
+    {
+      "id": "c39-en-train-de",
+      "title": "In the middle of → en train de",
+      "goal": "Say what's happening right now.",
+      "transferHook": "French has no -ing tense; instead a chunk: 'je suis en train de préparer' = 'I'm (in the middle of) preparing'. être + en train de + infinitive.",
+      "targetPattern": "[être] + en train de + [infinitive]",
+      "examples": ["je suis en train de travailler", "elle est en train de décider"],
+      "watchFor": "Learners reach for a French '-ing'. There isn't one — plain present or en train de covers it.",
+      "prereqs": ["c26-etre-past"]
+    },
+    {
+      "id": "c40-venir-de",
+      "title": "Just did → je viens de + verb",
+      "goal": "Get the just-happened past for free.",
+      "transferHook": "'je viens de finir' literally 'I come from finishing' = 'I just finished'. Like 'je vais + verb' gave the future, 'je viens de + verb' gives the fresh past.",
+      "targetPattern": "je viens de / tu viens de + [infinitive]",
+      "examples": ["je viens de finir", "je viens d'arriver", "on vient de commencer"],
+      "watchFor": "Mirror it against je vais + verb so they feel the symmetry: going-to future, coming-from past.",
+      "prereqs": ["c36-time-words"]
+    },
+    {
+      "id": "c41-imperative",
+      "title": "Commands → regarde, allons-y, dis-moi",
+      "goal": "Give instructions by dropping the subject.",
+      "transferHook": "Like English, French commands just drop the subject: 'tu regardes' → 'regarde !'. Bonus chunks: allons-y (let's go), dis-moi (tell me) — pronouns hop BEHIND in commands.",
+      "targetPattern": "[verb]! / [verb]-moi / allons-y",
+      "examples": ["regarde ça", "dis-moi", "allons-y", "continue !"],
+      "watchFor": "The pronoun flip (dis-MOI vs tu ME dis) will surprise them — present it as commands being pushy: the verb goes first.",
+      "prereqs": ["c30-me-te"]
+    },
+    {
+      "id": "c42-negation-variants",
+      "title": "Never, nothing, anymore → jamais, rien, plus",
+      "goal": "Swap pas for richer negatives in the same sandwich.",
+      "transferHook": "The ne...pas frame they own accepts other fillings: ne...jamais (never), ne...rien (nothing), ne...plus (not anymore). Same slots, new meanings.",
+      "targetPattern": "[subject] + ne + [verb] + jamais/rien/plus",
+      "examples": ["je ne sais pas", "je ne veux rien", "il ne travaille plus", "elle ne dit jamais non"],
+      "watchFor": "'plus' meaning 'no more' sounds 'plü' (silent s) — opposite of the 'more' plus. Sound is the disambiguator; flag it.",
+      "prereqs": ["c15-ne-pas-full", "c34-comparisons"]
+    },
+    {
+      "id": "c43-depuis",
+      "title": "I've been ... for → depuis + present",
+      "goal": "Express ongoing duration with a structural surprise.",
+      "transferHook": "Big contrast: English says 'I HAVE BEEN working for two hours'; French uses plain PRESENT: 'je travaille depuis deux heures'. The situation continues, so French stays in the present.",
+      "targetPattern": "[present clause] + depuis + [duration/point]",
+      "examples": ["je travaille depuis deux heures", "j'habite ici depuis un an"],
+      "watchFor": "The classic error is importing the perfect tense ('j'ai travaillé depuis...'). Walk them to why present makes sense: it's still true now.",
+      "prereqs": ["c40-venir-de"]
+    },
+    {
+      "id": "c44-conditional",
+      "title": "Would → je voudrais, ce serait, je ferais",
+      "goal": "Open the would-world from the voudrais they already own.",
+      "transferHook": "They've said 'je voudrais' since c14. The '-rais' ending IS would: ce serait (it would be), je ferais (I would do), j'aimerais (I would like). One sound, whole mood.",
+      "targetPattern": "[verb stem] + -rais / -rait",
+      "examples": ["ce serait possible", "j'aimerais continuer", "je ferais ça"],
+      "watchFor": "Grow it from known chunks, not conjugation tables. 'ce serait + adjective' is the workhorse.",
+      "prereqs": ["c14-je-voudrais", "c37-si-clauses"]
+    },
+    {
+      "id": "c45-opinion",
+      "title": "I think that → je pense que",
+      "goal": "Wrap any owned sentence in an opinion.",
+      "transferHook": "'je pense que' = 'I think that', and unlike English the 'que' is mandatory. Then: je crois que (I believe), je trouve que (I find). Opinion + any sentence they own.",
+      "targetPattern": "je pense / crois / trouve + que + [clause]",
+      "examples": ["je pense que c'est important", "je crois qu'elle a raison", "je trouve que c'est difficile"],
+      "watchFor": "que + il/elle contracts to qu'il / qu'elle. Reward stacking: opinion + comparison + connector.",
+      "prereqs": ["c38-relative-que", "c27-cetait"]
+    },
+    {
+      "id": "c46-avoir-idioms",
+      "title": "I'm hungry → j'ai faim (have, not be)",
+      "goal": "Meet the avoir-idioms where French has what English is.",
+      "transferHook": "French HAS states English IS: j'ai faim (I have hunger = I'm hungry), j'ai raison (I'm right), j'ai besoin de (I need = have need of). One flip unlocks a family.",
+      "targetPattern": "j'ai + faim / soif / raison / besoin de + [X]",
+      "examples": ["j'ai faim", "tu as raison", "j'ai besoin de temps", "j'ai envie de continuer"],
+      "watchFor": "'j'ai besoin de' + infinitive is the power chunk (I need to...). Watch for learners inserting 'suis'.",
+      "prereqs": ["c25-past-irregulars"]
+    },
+    {
+      "id": "c47-sequencers",
+      "title": "First, then, so → d'abord, ensuite, donc",
+      "goal": "Tell a whole little story in order.",
+      "transferHook": "Narrative glue: d'abord (first), ensuite/après (then), donc (so), enfin (finally). Combine with both pasts and the future to narrate like in English.",
+      "targetPattern": "d'abord ... ensuite ... donc ... enfin ...",
+      "examples": ["d'abord j'ai préparé, ensuite j'ai commencé", "c'était difficile, donc j'ai décidé de continuer"],
+      "watchFor": "This is a synthesis node: push for 3-4 linked sentences using only owned material. Length is the win.",
+      "prereqs": ["c36-time-words", "c45-opinion"]
+    },
+    {
+      "id": "c48-storytime",
+      "title": "Tell me your day",
+      "goal": "Capstone: narrate real life mixing every owned system.",
+      "transferHook": "No new grammar — the transfer is confidence: everything needed to describe a real day already exists in their inventory (pasts, future, opinions, connectors, quantities).",
+      "targetPattern": "Free narration: 5+ sentences about a real or imagined day.",
+      "examples": ["hier je suis allé au bureau, il y avait beaucoup de travail...", "demain je vais organiser mon projet parce que c'est important"],
+      "watchFor": "Resist teaching. Only prompt with questions (et ensuite ? pourquoi ?) and let them build. Mastery = a connected multi-sentence narration.",
+      "prereqs": ["c47-sequencers", "c44-conditional", "c46-avoir-idioms", "c42-negation-variants"]
     }
   ]
 }

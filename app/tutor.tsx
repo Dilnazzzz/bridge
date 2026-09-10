@@ -3,21 +3,46 @@
 import { useEffect, useRef, useState } from 'react';
 
 type Seg = { lang: string; text: string };
-type Msg = { role: 'user' | 'assistant'; content: string; segments?: Seg[] };
+type SpeechRating = { rating: 'clear' | 'close' | 'unclear' | 'na'; note?: string };
+type Msg = { role: 'user' | 'assistant'; content: string; segments?: Seg[]; speech?: SpeechRating };
 type C = { id: string; title: string };
-type WordEntry = {
+
+type WordItem = {
   word: string;
   gloss?: string;
-  constructionId: string;
+  constructionId?: string;
   firstSeen: string;
-  lastProduced?: string;
-  timesProduced: number;
+  lastReview: string;
+  due: string;
+  stability: number;
+  reps: number;
+  lapses: number;
 };
-type ApiWord = { word: string; gloss?: string };
-type Progress = { idx: number; masteredIds: string[] };
 
-const WORDS_KEY = 'bridge.words.v1';
-const PROGRESS_KEY = 'bridge.progress.v1';
+type Snapshot = {
+  currentNodeId: string | null;
+  nodeIndex: number;
+  nodeTotal: number;
+  masteredNodes: string[];
+  words: WordItem[];
+  dueCount: number;
+  checkpoints: { ts: string; masteredNodes: number; correct: number; total: number }[];
+  checkpointActive: boolean;
+};
+
+type Story = {
+  title: string;
+  sentences: { fr: string; en: string }[];
+  questions: { q: string; answer: string }[];
+};
+
+type HeadStart = {
+  total: number;
+  scopeTotal: number;
+  clusters: { type: string; count: number; examples: string[] }[];
+  words: string[];
+};
+
 const VOICE_KEY = 'bridge.voice.v1';
 const VOICE_PREFS_KEY = 'bridge.voiceprefs.v1';
 const HANDSFREE_KEY = 'bridge.handsfree.v1';
@@ -59,6 +84,13 @@ function languageName(code: string): string {
   }
 }
 
+function clusterLabel(type: string): string {
+  if (type === 'identical') return 'spelled the same';
+  if (type === 'accent-only') return 'accents aside';
+  if (type === 'near') return 'nearly the same';
+  return type.replace('rule:', '');
+}
+
 function loadVoicePrefs(): Record<string, string> {
   try {
     return JSON.parse(localStorage.getItem(VOICE_PREFS_KEY) ?? '{}') as Record<string, string>;
@@ -67,42 +99,13 @@ function loadVoicePrefs(): Record<string, string> {
   }
 }
 
-function loadWords(): Record<string, WordEntry> {
-  try {
-    return JSON.parse(localStorage.getItem(WORDS_KEY) ?? '{}') as Record<string, WordEntry>;
-  } catch {
-    return {};
-  }
-}
-
-function saveWords(words: Record<string, WordEntry>) {
-  try {
-    localStorage.setItem(WORDS_KEY, JSON.stringify(words));
-  } catch {}
-}
-
-function loadProgress(): Progress | null {
-  try {
-    const raw = localStorage.getItem(PROGRESS_KEY);
-    return raw ? (JSON.parse(raw) as Progress) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveProgress(p: Progress) {
-  try {
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
-  } catch {}
-}
-
 function speechAvailable() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
 
 // SpeechRecognition is not in TypeScript's DOM lib yet — minimal local types.
 type RecognitionEvent = {
-  results: { length: number; [i: number]: { 0: { transcript: string } } };
+  results: { length: number; [i: number]: { 0: { transcript: string; confidence?: number } } };
 };
 type Recognition = {
   lang: string;
@@ -124,19 +127,41 @@ function getRecognitionCtor(): (new () => Recognition) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-type HeadStart = {
-  total: number;
-  scopeTotal: number;
-  clusters: { type: string; count: number; examples: string[] }[];
-  words: string[];
-};
-
-function clusterLabel(type: string): string {
-  if (type === 'identical') return 'spelled the same';
-  if (type === 'accent-only') return 'accents aside';
-  if (type === 'near') return 'nearly the same';
-  return type.replace('rule:', '');
+// Legacy localStorage bank from pre-server-state versions of the app.
+function readLegacy(): { words: { word: string; gloss?: string; constructionId?: string }[]; masteredIds: string[] } | null {
+  try {
+    const words = JSON.parse(localStorage.getItem('bridge.words.v1') ?? 'null') as Record<
+      string,
+      { word: string; gloss?: string; constructionId?: string }
+    > | null;
+    const prog = JSON.parse(localStorage.getItem('bridge.progress.v1') ?? 'null') as { masteredIds?: string[] } | null;
+    if (!words && !prog) return null;
+    return {
+      words: words ? Object.values(words).map((w) => ({ word: w.word, gloss: w.gloss, constructionId: w.constructionId })) : [],
+      masteredIds: prog?.masteredIds ?? [],
+    };
+  } catch {
+    return null;
+  }
 }
+
+const pill = (active: boolean): React.CSSProperties => ({
+  fontSize: 14,
+  padding: '6px 12px',
+  borderRadius: 999,
+  border: '1px solid #ddd',
+  background: active ? '#111' : '#fafafa',
+  color: active ? '#fff' : '#333',
+  cursor: 'pointer',
+});
+
+const panelBox: React.CSSProperties = {
+  border: '1px solid #eee',
+  borderRadius: 10,
+  padding: '12px 14px',
+  marginBottom: 8,
+  fontSize: 14,
+};
 
 export default function Tutor({
   constructions,
@@ -148,13 +173,11 @@ export default function Tutor({
   headStart: HeadStart | null;
 }) {
   const [started, setStarted] = useState(false);
-  const [idx, setIdx] = useState(0);
+  const [snap, setSnap] = useState<Snapshot | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [words, setWords] = useState<Record<string, WordEntry>>({});
   const [showWords, setShowWords] = useState(false);
-  const [resume, setResume] = useState<Progress | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
   const [recording, setRecording] = useState(false);
   const [micSupported, setMicSupported] = useState(false);
@@ -163,22 +186,53 @@ export default function Tutor({
   const [showVoices, setShowVoices] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [story, setStory] = useState<Story | null>(null);
+  const [storySegs, setStorySegs] = useState<Seg[]>([]);
+  const [showStory, setShowStory] = useState(false);
+  const [storyLoading, setStoryLoading] = useState(false);
+  const [storyEnglish, setStoryEnglish] = useState(false);
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<number, boolean>>({});
+  const [showCoverage, setShowCoverage] = useState(false);
+  const [coverageText, setCoverageText] = useState('');
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const voicePrefsRef = useRef<Record<string, string>>({});
   const voiceOnRef = useRef(true);
   const recRef = useRef<Recognition | null>(null);
   const handsFreeRef = useRef(false);
-  const wordsRef = useRef<Record<string, WordEntry>>({});
+  const snapRef = useRef<Snapshot | null>(null);
   const transcriptRef = useRef('');
+  const confidenceRef = useRef<number | undefined>(undefined);
+  const inputFromMicRef = useRef(false);
   const speakIdRef = useRef(0);
   const emptyListensRef = useRef(0);
 
+  const nodeIdx = Math.min(snap?.nodeIndex ?? 0, constructions.length - 1);
+  const node = constructions[nodeIdx];
+  const courseComplete = snap !== null && snap.currentNodeId === null;
+
   useEffect(() => {
-    const w = loadWords();
-    setWords(w);
-    wordsRef.current = w;
-    setResume(loadProgress());
+    void (async () => {
+      try {
+        const res = await fetch('/api/learner');
+        let s = (await res.json()).state as Snapshot;
+        if (s && s.words.length === 0 && s.masteredNodes.length === 0) {
+          const legacy = readLegacy();
+          if (legacy && (legacy.words.length || legacy.masteredIds.length)) {
+            const r2 = await fetch('/api/learner', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(legacy),
+            });
+            const d2 = (await r2.json()) as { state?: Snapshot };
+            if (d2.state) s = d2.state;
+          }
+        }
+        setSnap(s);
+        snapRef.current = s;
+      } catch {}
+    })();
     try {
       const v = localStorage.getItem(VOICE_KEY);
       if (v !== null) {
@@ -289,10 +343,16 @@ export default function Tutor({
     rec.interimResults = true;
     rec.continuous = false;
     transcriptRef.current = '';
+    confidenceRef.current = undefined;
     rec.onresult = (e) => {
       let text = '';
-      for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      for (let i = 0; i < e.results.length; i++) {
+        text += e.results[i][0].transcript;
+        const c = e.results[i][0].confidence;
+        if (typeof c === 'number' && c > 0) confidenceRef.current = c;
+      }
       transcriptRef.current = text;
+      inputFromMicRef.current = true;
       setInput(text);
     };
     rec.onend = () => {
@@ -301,7 +361,7 @@ export default function Tutor({
       if (!handsFreeRef.current) return;
       if (heard) {
         emptyListensRef.current = 0;
-        void sendText(heard);
+        void sendText(heard, { spoken: true, confidence: confidenceRef.current });
       } else if (emptyListensRef.current < 2) {
         // heard nothing — listen again a couple of times before giving up
         emptyListensRef.current += 1;
@@ -348,76 +408,39 @@ export default function Tutor({
     if (!next && speechAvailable()) window.speechSynthesis.cancel();
   }
 
-  function bankForRequest(): ApiWord[] {
-    return Object.values(wordsRef.current)
-      .sort((a, b) =>
-        (a.lastProduced ?? a.firstSeen) < (b.lastProduced ?? b.firstSeen) ? -1 : 1,
-      )
-      .slice(0, 20)
-      .map((w) => ({ word: w.word, gloss: w.gloss }));
-  }
-
-  async function post(constructionId: string, history: Msg[]) {
+  async function post(body: object) {
     const res = await fetch('/api/tutor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        constructionId,
-        messages: history.map((m) => ({ role: m.role, content: m.content })),
-        knownWords: bankForRequest(),
-      }),
+      body: JSON.stringify(body),
     });
     return res.json() as Promise<{
       reply?: string;
       mastered?: boolean;
-      words?: ApiWord[];
+      speech?: SpeechRating;
       segments?: Seg[];
+      state?: Snapshot;
+      story?: Story;
       error?: string;
     }>;
   }
 
-  function bankWords(newWords: ApiWord[], constructionId: string) {
-    if (!newWords.length) return;
-    setWords((prev) => {
-      const next = { ...prev };
-      const now = new Date().toISOString();
-      for (const { word, gloss } of newWords) {
-        const key = word.trim().toLowerCase();
-        if (!key) continue;
-        if (next[key]) {
-          next[key] = {
-            ...next[key],
-            gloss: gloss ?? next[key].gloss,
-            lastProduced: now,
-            timesProduced: next[key].timesProduced + 1,
-          };
-        } else {
-          next[key] = { word: word.trim(), gloss, constructionId, firstSeen: now, lastProduced: now, timesProduced: 1 };
-        }
-      }
-      saveWords(next);
-      wordsRef.current = next;
-      return next;
-    });
-  }
-
-  function recordMastery(atIdx: number) {
-    const masteredId = constructions[atIdx].id;
-    const prev = loadProgress();
-    const masteredIds = Array.from(new Set([...(prev?.masteredIds ?? []), masteredId]));
-    const nextIdx = Math.min(atIdx + 1, constructions.length - 1);
-    saveProgress({ idx: nextIdx, masteredIds });
-  }
-
-  async function beginLesson(atIdx: number) {
-    setIdx(atIdx);
-    const prev = loadProgress();
-    saveProgress({ idx: atIdx, masteredIds: prev?.masteredIds ?? [] });
+  async function beginLesson() {
+    const current = snapRef.current;
+    const nodeId = current?.currentNodeId;
+    if (!nodeId) return;
     const seed: Msg[] = [{ role: 'user', content: "Let's begin." }];
     setMessages(seed);
     setLoading(true);
     try {
-      const data = await post(constructions[atIdx].id, seed);
+      const data = await post({
+        constructionId: nodeId,
+        messages: seed.map((m) => ({ role: m.role, content: m.content })),
+      });
+      if (data.state) {
+        setSnap(data.state);
+        snapRef.current = data.state;
+      }
       setMessages([...seed, { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}`, segments: data.segments }]);
       speak(data.segments, () => {
         if (handsFreeRef.current) startRecognition();
@@ -429,34 +452,44 @@ export default function Tutor({
     }
   }
 
-  async function sendText(raw: string) {
+  async function sendText(raw: string, opts?: { spoken?: boolean; confidence?: number }) {
     const text = raw.trim();
     if (!text || loading) return;
     if (recording) recRef.current?.stop();
     transcriptRef.current = '';
+    inputFromMicRef.current = false;
+    const nodeId = snapRef.current?.currentNodeId ?? node.id;
     const history: Msg[] = [...messages, { role: 'user', content: text }];
     setMessages(history);
     setInput('');
     setLoading(true);
     try {
-      const data = await post(constructions[idx].id, history);
-      setMessages([...history, { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}`, segments: data.segments }]);
+      const data = await post({
+        constructionId: nodeId,
+        messages: history.map((m) => ({ role: m.role, content: m.content })),
+        spoken: opts?.spoken ?? false,
+        asrConfidence: opts?.confidence,
+      });
+      if (data.state) {
+        setSnap(data.state);
+        snapRef.current = data.state;
+      }
+      const badge = opts?.spoken && data.speech && data.speech.rating !== 'na' ? data.speech : undefined;
+      const userMsg: Msg = badge ? { ...history[history.length - 1], speech: badge } : history[history.length - 1];
+      const assistantMsg: Msg = { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}`, segments: data.segments };
+      setMessages([...history.slice(0, -1), userMsg, assistantMsg]);
       speak(data.segments, () => {
         if (data.mastered) {
-          if (idx < constructions.length - 1) setTimeout(() => beginLesson(idx + 1), 800);
+          if (data.state?.currentNodeId) setTimeout(() => void beginLesson(), 800);
         } else if (handsFreeRef.current) {
           startRecognition();
         }
       });
-      bankWords(data.words ?? [], constructions[idx].id);
-      if (data.mastered) {
-        recordMastery(idx);
-        if (idx >= constructions.length - 1) {
-          setMessages((m) => [
-            ...m,
-            { role: 'assistant', content: `🎉 That was the last lesson — you've worked through all ${constructions.length} constructions.` },
-          ]);
-        }
+      if (data.mastered && data.state?.currentNodeId === null) {
+        setMessages((m) => [
+          ...m,
+          { role: 'assistant', content: `🎉 That was the last lesson — you've worked through all ${constructions.length} constructions.` },
+        ]);
       }
     } catch {
       setMessages([...history, { role: 'assistant', content: '⚠ Could not reach the tutor.' }]);
@@ -466,22 +499,42 @@ export default function Tutor({
   }
 
   function send() {
-    void sendText(input);
+    void sendText(input, { spoken: inputFromMicRef.current, confidence: confidenceRef.current });
   }
 
-  function startOver() {
+  async function startOver() {
     try {
-      localStorage.removeItem(WORDS_KEY);
-      localStorage.removeItem(PROGRESS_KEY);
+      const res = await fetch('/api/learner', { method: 'DELETE' });
+      const data = (await res.json()) as { state?: Snapshot };
+      if (data.state) {
+        setSnap(data.state);
+        snapRef.current = data.state;
+      }
+      localStorage.removeItem('bridge.words.v1');
+      localStorage.removeItem('bridge.progress.v1');
     } catch {}
-    setWords({});
-    setResume(null);
     setStarted(true);
-    beginLesson(0);
+    void beginLesson();
+  }
+
+  async function loadStory() {
+    setShowStory(true);
+    setStoryLoading(true);
+    setRevealedAnswers({});
+    setStoryEnglish(false);
+    try {
+      const data = await post({ mode: 'story' });
+      if (data.story) {
+        setStory(data.story);
+        setStorySegs(data.segments ?? []);
+      }
+    } finally {
+      setStoryLoading(false);
+    }
   }
 
   const visible = messages.filter((m, i) => !(i === 0 && m.content === "Let's begin."));
-  const wordList = Object.values(words).sort((a, b) => (a.firstSeen < b.firstSeen ? 1 : -1));
+  const wordList = snap?.words ?? [];
   const wordCount = wordList.length;
   const producedTokens = new Set<string>();
   for (const w of wordList) {
@@ -490,7 +543,25 @@ export default function Tutor({
     }
   }
   const networkCovered = headStart ? headStart.words.filter((f) => producedTokens.has(f)).length : 0;
-  const canResume = resume !== null && (resume.idx > 0 || resume.masteredIds.length > 0);
+  const cognateSet = headStart ? new Set(headStart.words) : new Set<string>();
+  const canResume = snap !== null && (wordCount > 0 || snap.masteredNodes.length > 0);
+  const lastCheckpoint = snap?.checkpoints[snap.checkpoints.length - 1];
+  const nowIso = new Date().toISOString();
+
+  const coverageTokens = coverageText
+    ? coverageText.split(/([A-Za-zÀ-ÖØ-öø-ÿœæŒÆ'-]+)/).map((tok, i) => {
+        const isWord = /^[A-Za-zÀ-ÖØ-öø-ÿœæŒÆ'-]+$/.test(tok);
+        if (!isWord) return { key: i, tok, cls: 'x' };
+        const lc = tok.toLowerCase();
+        if (producedTokens.has(lc)) return { key: i, tok, cls: 'known' };
+        if (cognateSet.has(lc)) return { key: i, tok, cls: 'cognate' };
+        return { key: i, tok, cls: 'unknown' };
+      })
+    : [];
+  const covWords = coverageTokens.filter((t) => t.cls !== 'x');
+  const covKnown = covWords.filter((t) => t.cls === 'known').length;
+  const covCognate = covWords.filter((t) => t.cls === 'cognate').length;
+  const covPct = covWords.length ? Math.round(((covKnown + covCognate) / covWords.length) * 100) : 0;
 
   if (!started) {
     return (
@@ -519,24 +590,27 @@ export default function Tutor({
             You already recognize thousands of French words — the ones ending in -tion, -able, -ent are nearly the same. This tutor won&apos;t give you answers. It will ask you questions until you build French yourself.
           </p>
         )}
-        {canResume && (
+        {canResume && snap && (
           <p style={{ marginTop: 16, fontSize: 15, color: '#555' }}>
-            Welcome back — you own {wordCount} {wordCount === 1 ? 'word' : 'words'} and you&apos;re on lesson {resume.idx + 1} of {constructions.length}.
+            Welcome back — you own {wordCount} {wordCount === 1 ? 'word' : 'words'}
+            {snap.dueCount > 0 ? ` (${snap.dueCount} due for review)` : ''} and you&apos;re on lesson {Math.min(snap.nodeIndex + 1, snap.nodeTotal)} of {snap.nodeTotal}.
+            {lastCheckpoint ? ` Last checkpoint: ${lastCheckpoint.correct}/${lastCheckpoint.total}.` : ''}
           </p>
         )}
         <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
           <button
             onClick={() => {
               setStarted(true);
-              beginLesson(canResume ? resume.idx : 0);
+              void beginLesson();
             }}
-            style={{ padding: '12px 20px', fontSize: 16, borderRadius: 8, border: '1px solid #111', background: '#111', color: '#fff', cursor: 'pointer' }}
+            disabled={snap === null}
+            style={{ padding: '12px 20px', fontSize: 16, borderRadius: 8, border: '1px solid #111', background: '#111', color: '#fff', cursor: 'pointer', opacity: snap === null ? 0.5 : 1 }}
           >
-            {canResume ? 'Continue' : 'Start'}
+            {snap === null ? 'Loading…' : canResume ? 'Continue' : 'Start'}
           </button>
           {canResume && (
             <button
-              onClick={startOver}
+              onClick={() => void startOver()}
               style={{ padding: '12px 20px', fontSize: 16, borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#555', cursor: 'pointer' }}
             >
               Start over
@@ -549,41 +623,26 @@ export default function Tutor({
 
   return (
     <main style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <div style={{ borderBottom: '1px solid #eee', paddingBottom: 8, marginBottom: 8, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 13, color: '#888' }}>Lesson {idx + 1} of {constructions.length}</div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>{constructions[idx].title}</div>
+      <div style={{ borderBottom: '1px solid #eee', paddingBottom: 8, marginBottom: 8, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, color: '#888' }}>
+            {courseComplete ? 'Course complete 🎉' : `Lesson ${nodeIdx + 1} of ${constructions.length}`}
+            {snap && snap.dueCount > 0 ? ` · ${snap.dueCount} due` : ''}
+            {snap?.checkpointActive ? ' · 📋 checkpoint' : ''}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.title}</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <button onClick={() => void loadStory()} title="A tiny story from the words you own" style={pill(showStory)}>📖</button>
+          <button onClick={() => setShowCoverage((s) => !s)} title="Paste French text — see how much you can already read" style={pill(showCoverage)}>📄</button>
           {micSupported && (
-            <button
-              onClick={toggleHandsFree}
-              title={handsFree ? 'Hands-free on — the tutor listens after speaking' : 'Hands-free off — click to converse by voice only'}
-              style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: handsFree ? '#111' : '#fafafa', color: handsFree ? '#fff' : '#333', cursor: 'pointer' }}
-            >
-              🎧
-            </button>
+            <button onClick={toggleHandsFree} title={handsFree ? 'Hands-free on' : 'Hands-free off — click to converse by voice only'} style={pill(handsFree)}>🎧</button>
           )}
-          <button
-            onClick={() => setShowVoices((s) => !s)}
-            title="Choose voices"
-            style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: showVoices ? '#111' : '#fafafa', color: showVoices ? '#fff' : '#333', cursor: 'pointer' }}
-          >
-            ⚙
-          </button>
-          <button
-            onClick={toggleVoice}
-            title={voiceOn ? 'Voice on — click to mute' : 'Voice off — click to unmute'}
-            style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: '#fafafa', color: '#333', cursor: 'pointer' }}
-          >
+          <button onClick={() => setShowVoices((s) => !s)} title="Choose voices" style={pill(showVoices)}>⚙</button>
+          <button onClick={toggleVoice} title={voiceOn ? 'Voice on — click to mute' : 'Voice off — click to unmute'} style={pill(false)}>
             {voiceOn ? '🔊' : '🔇'}
           </button>
-          <button
-            onClick={() => setShowWords((s) => !s)}
-            style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: showWords ? '#111' : '#fafafa', color: showWords ? '#fff' : '#333', cursor: 'pointer' }}
-          >
-            ★ {wordCount} {wordCount === 1 ? 'word' : 'words'}
-          </button>
+          <button onClick={() => setShowWords((s) => !s)} style={pill(showWords)}>★ {wordCount}</button>
         </div>
       </div>
       {handsFree && (
@@ -591,8 +650,81 @@ export default function Tutor({
           {loading ? '… thinking' : speaking ? '🔊 speaking — listen' : recording ? '🎤 listening — just answer out loud' : 'hands-free: tap 🎤 if I stop listening'}
         </div>
       )}
+      {showStory && (
+        <div style={panelBox}>
+          {storyLoading || !story ? (
+            <div style={{ color: '#888' }}>Writing a story from your words…</div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <strong>{story.title}</strong>
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => speak(storySegs)} title="Listen" style={{ ...pill(false), padding: '4px 10px' }}>🔊</button>
+                  <button onClick={() => setStoryEnglish((s) => !s)} style={{ ...pill(storyEnglish), padding: '4px 10px' }}>EN</button>
+                  <button onClick={() => setShowStory(false)} style={{ ...pill(false), padding: '4px 10px' }}>✕</button>
+                </span>
+              </div>
+              <div style={{ marginTop: 8, lineHeight: 1.7 }}>
+                {story.sentences.map((s, i) => (
+                  <div key={i}>
+                    <span>{s.fr}</span>
+                    {storyEnglish && <span style={{ color: '#999' }}> — {s.en}</span>}
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 10, borderTop: '1px solid #f5f5f5', paddingTop: 8 }}>
+                {story.questions.map((q, i) => (
+                  <div key={i} style={{ padding: '2px 0' }}>
+                    <button
+                      onClick={() => setRevealedAnswers((r) => ({ ...r, [i]: !r[i] }))}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#333', fontSize: 14, textAlign: 'left' }}
+                    >
+                      {q.q} {revealedAnswers[i] ? <span style={{ color: '#888' }}>→ {q.answer}</span> : <span style={{ color: '#bbb' }}>(tap for answer)</span>}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {showCoverage && (
+        <div style={panelBox}>
+          <textarea
+            value={coverageText}
+            onChange={(e) => setCoverageText(e.target.value)}
+            placeholder="Paste any French text — a headline, a paragraph, song lyrics — and see how much of it you can already read."
+            style={{ width: '100%', minHeight: 64, padding: 8, borderRadius: 6, border: '1px solid #ccc', fontSize: 14, fontFamily: 'inherit', resize: 'vertical' }}
+        />
+          {coverageText && (
+            <>
+              <div style={{ marginTop: 8, lineHeight: 1.8 }}>
+                {coverageTokens.map((t) =>
+                  t.cls === 'x' ? (
+                    <span key={t.key}>{t.tok}</span>
+                  ) : (
+                    <span
+                      key={t.key}
+                      style={{
+                        background: t.cls === 'known' ? '#dff2df' : t.cls === 'cognate' ? '#e6ebfa' : '#fdeaea',
+                        borderRadius: 3,
+                        padding: '0 2px',
+                      }}
+                    >
+                      {t.tok}
+                    </span>
+                  ),
+                )}
+              </div>
+              <div style={{ color: '#888', fontSize: 12, marginTop: 6 }}>
+                {covPct}% readable — {covKnown} produced by you, {covCognate} instant cognates, {covWords.length - covKnown - covCognate} new. Green = yours, blue = cognate, red = new.
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {showVoices && (
-        <div style={{ border: '1px solid #eee', borderRadius: 10, padding: '12px 14px', marginBottom: 8, fontSize: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ ...panelBox, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[language.to, language.from].map((code) => {
             const options = voices
               .filter((v) => normLang(v.lang).startsWith(code.toLowerCase()))
@@ -628,7 +760,7 @@ export default function Tutor({
         </div>
       )}
       {showWords && (
-        <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #eee', borderRadius: 10, padding: '10px 14px', marginBottom: 8, fontSize: 14 }}>
+        <div style={{ ...panelBox, maxHeight: 200, overflowY: 'auto' }}>
           {wordCount === 0 ? (
             <div style={{ color: '#888' }}>No words yet — they&apos;ll appear here as you produce French yourself.</div>
           ) : (
@@ -639,38 +771,52 @@ export default function Tutor({
                   {w.gloss && <span style={{ color: '#888' }}> — {w.gloss}</span>}
                 </span>
                 <span style={{ color: '#999', flexShrink: 0 }}>
-                  {constructions.find((c) => c.id === w.constructionId)?.title ?? w.constructionId}
-                  {w.timesProduced > 1 ? ` · ×${w.timesProduced}` : ''}
+                  {w.due <= nowIso ? 'due' : ''} ×{w.reps}
+                  {w.lapses > 0 ? ` ✗${w.lapses}` : ''}
                 </span>
               </div>
             ))
           )}
-          {headStart && (
+          {(headStart || lastCheckpoint) && (
             <div style={{ color: '#999', fontSize: 12, paddingTop: 6 }}>
-              Cognate network: {networkCovered} of {Math.min(headStart.words.length, headStart.total).toLocaleString()} instant-transfer words produced so far.
+              {headStart && (
+                <>Cognate network: {networkCovered} of {Math.min(headStart.words.length, headStart.total).toLocaleString()} instant-transfer words produced. </>
+              )}
+              {lastCheckpoint && <>Last checkpoint: {lastCheckpoint.correct}/{lastCheckpoint.total}.</>}
             </div>
           )}
         </div>
       )}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
         {visible.map((m, i) => (
-          <div
-            key={i}
-            onClick={m.role === 'assistant' && m.segments?.length ? () => speak(m.segments) : undefined}
-            title={m.role === 'assistant' && m.segments?.length ? 'Click to hear it again' : undefined}
-            style={{
-              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '80%',
-              padding: '10px 14px',
-              borderRadius: 14,
-              background: m.role === 'user' ? '#111' : '#f2f2f2',
-              color: m.role === 'user' ? '#fff' : '#111',
-              whiteSpace: 'pre-wrap',
-              lineHeight: 1.5,
-              cursor: m.role === 'assistant' && m.segments?.length ? 'pointer' : 'default',
-            }}
-          >
-            {m.content}
+          <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div
+              onClick={m.role === 'assistant' && m.segments?.length ? () => speak(m.segments) : undefined}
+              title={m.role === 'assistant' && m.segments?.length ? 'Click to hear it again' : undefined}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 14,
+                background: m.role === 'user' ? '#111' : '#f2f2f2',
+                color: m.role === 'user' ? '#fff' : '#111',
+                whiteSpace: 'pre-wrap',
+                lineHeight: 1.5,
+                cursor: m.role === 'assistant' && m.segments?.length ? 'pointer' : 'default',
+              }}
+            >
+              {m.content}
+            </div>
+            {m.speech && (
+              <div
+                title={m.speech.note}
+                style={{
+                  fontSize: 12,
+                  marginTop: 2,
+                  color: m.speech.rating === 'clear' ? '#2c7' : m.speech.rating === 'close' ? '#c90' : '#999',
+                }}
+              >
+                {m.speech.rating === 'clear' ? '🗣 clear ✓' : m.speech.rating === 'close' ? '🗣 close ≈' : '🗣 unclear ?'}
+              </div>
+            )}
           </div>
         ))}
         {loading && <div style={{ alignSelf: 'flex-start', color: '#aaa', fontStyle: 'italic' }}>…</div>}
@@ -695,7 +841,10 @@ export default function Tutor({
         )}
         <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            inputFromMicRef.current = false;
+            setInput(e.target.value);
+          }}
           onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
           placeholder={recording ? 'Listening — speak French…' : 'Say it in French…'}
           style={{ flex: 1, padding: '12px 14px', fontSize: 16, borderRadius: 8, border: recording ? '1px solid #c00' : '1px solid #ccc' }}
