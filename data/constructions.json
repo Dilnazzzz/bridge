@@ -1,0 +1,114 @@
+{
+  "language": { "from": "en", "to": "fr" },
+  "note": "Ordered curriculum for a Thinking-Method tutor (English speaker learning French). Each node is a scaffold, not a script: the tutor uses these fields to run a live Socratic exchange. Built in the spirit of the method, not copied from any course.",
+  "constructions": [
+    {
+      "id": "c01-cognates",
+      "title": "The words you already own",
+      "goal": "Feel the head start: thousands of French words are already yours.",
+      "transferHook": "English '-tion' nouns are spelled the same in French (information, nation, situation, direction); '-able/-ible' and '-ent/-ant' words too (possible, important, différent). Only the pronunciation changes.",
+      "targetPattern": "Recognize and attempt to pronounce cognate nouns and adjectives.",
+      "examples": ["information", "situation", "possible", "important", "différent"],
+      "watchFor": "This node is about realization and pronunciation, not making sentences yet. The win is the learner feeling how much they already have."
+    },
+    {
+      "id": "c02-cest",
+      "title": "It is → c'est",
+      "goal": "Make a first real French sentence using the cognates.",
+      "transferHook": "'c'est' ≈ 'it's / that's / this is'. Bolt it onto a word they already own.",
+      "targetPattern": "c'est + [cognate adjective/noun]",
+      "examples": ["c'est possible", "c'est important", "c'est une situation difficile"],
+      "watchFor": "Keep it to c'est + one word at first. Let them build up, don't hand them long sentences."
+    },
+    {
+      "id": "c03-negation",
+      "title": "It's not → c'est pas",
+      "goal": "Negate what they can already say.",
+      "transferHook": "'pas' ≈ 'not'. Formally French wraps the verb (ne ... pas), but in speech people drop the 'ne': 'c'est pas possible'.",
+      "targetPattern": "c'est pas + X   (formal: ce n'est pas + X)",
+      "examples": ["c'est pas possible", "ce n'est pas important"],
+      "watchFor": "Let them discover where 'pas' sits. Introduce the full ne...pas only after the spoken form lands."
+    },
+    {
+      "id": "c04-je-veux-inf",
+      "title": "I want to → je veux + verb",
+      "goal": "Unlock generative speech: want + a huge set of cognate verbs.",
+      "transferHook": "Many French verbs end in '-er' and are cousins of English ones: préparer, organiser, continuer, décider, arriver. 'je veux' ≈ 'I want'.",
+      "targetPattern": "je veux + [infinitive]",
+      "examples": ["je veux continuer", "je veux organiser", "je veux décider"],
+      "watchFor": "This is the big unlock — let them feel that one pattern + many cognate verbs = many sentences."
+    },
+    {
+      "id": "c05-no-to",
+      "title": "There is no 'to'",
+      "goal": "Internalize a key structural contrast with English.",
+      "transferHook": "English says 'I want TO continue'; French just says 'je veux continuer' — nothing stands in for 'to'.",
+      "targetPattern": "Reinforce c04 with no inserted word between veux and the verb.",
+      "examples": ["je veux continuer", "je veux préparer"],
+      "watchFor": "The classic beginner error is inserting 'à' or a word for 'to'. Guide them to leave the gap empty; don't just correct it."
+    },
+    {
+      "id": "c06-je-peux",
+      "title": "I can → je peux + verb",
+      "goal": "Reuse the modal-plus-verb machine with a new modal.",
+      "transferHook": "'je peux' ≈ 'I can'. Same shape as 'je veux': modal + bare infinitive.",
+      "targetPattern": "je peux + [infinitive]",
+      "examples": ["je peux organiser", "je peux continuer"],
+      "watchFor": "Same no-'to' rule as c05. Let them notice the pattern is identical."
+    },
+    {
+      "id": "c07-je-vais-futur",
+      "title": "I'm going to → je vais + verb",
+      "goal": "Get the near future for free.",
+      "transferHook": "French uses 'aller' (to go) + a verb exactly like English 'going to': 'je vais préparer' = 'I'm going to prepare'.",
+      "targetPattern": "je vais + [infinitive]",
+      "examples": ["je vais préparer", "je vais organiser"],
+      "watchFor": "Distinguish from literal 'I go to a place'. Here it's future, same as English 'going to'."
+    },
+    {
+      "id": "c08-questions",
+      "title": "Asking, the easy way",
+      "goal": "Turn any statement into a question with no new grammar.",
+      "transferHook": "Easiest question = say the statement with a rising tone, or put 'est-ce que' in front.",
+      "targetPattern": "[statement]?  /  est-ce que + [statement]",
+      "examples": ["tu veux continuer ?", "est-ce que tu peux organiser ?"],
+      "watchFor": "Do not introduce inversion yet. Keep it to intonation and est-ce que."
+    },
+    {
+      "id": "c09-subjects",
+      "title": "Changing the doer → tu, on",
+      "goal": "Swap the subject with minimal conjugation.",
+      "transferHook": "'je veux' → 'tu veux' (you) → 'on peut' (we, in speech). Small, controlled steps.",
+      "targetPattern": "tu / on + verb form",
+      "examples": ["tu veux", "on peut", "on va continuer"],
+      "watchFor": "Introduce one subject at a time. Don't dump a conjugation table."
+    },
+    {
+      "id": "c10-object-pronoun",
+      "title": "Do it → le faire",
+      "goal": "Meet a structural contrast: the pronoun comes before the verb.",
+      "transferHook": "English 'do it' puts 'it' after. French 'le faire' puts it before: 'je veux le faire' = 'I want to do it'.",
+      "targetPattern": "je veux / peux + le/la + [infinitive]",
+      "examples": ["je veux le faire", "je peux le préparer"],
+      "watchFor": "The word order flip is the whole lesson. Let them place the pronoun themselves and feel where it goes."
+    },
+    {
+      "id": "c11-connectors",
+      "title": "Gluing sentences → mais, parce que, avec",
+      "goal": "Extend sentences cheaply and sound more fluent.",
+      "transferHook": "'mais' (but), 'parce que' (because), 'avec' (with) let them chain what they can already say.",
+      "targetPattern": "[clause] + connector + [clause]",
+      "examples": ["je veux continuer mais c'est difficile", "je peux le faire parce que c'est possible"],
+      "watchFor": "Reward longer sentences built only from pieces they already own."
+    },
+    {
+      "id": "c12-passe-compose",
+      "title": "The past → j'ai + verb-é",
+      "goal": "Say what they did, using the same cognate verbs.",
+      "transferHook": "'j'ai' = 'I have'; '-er' verbs become '-é'. So 'j'ai préparé' ≈ 'I have prepared / I prepared'. Mirrors English 'have + -ed'.",
+      "targetPattern": "j'ai + [past participle in -é]",
+      "examples": ["j'ai préparé", "j'ai organisé", "j'ai décidé"],
+      "watchFor": "Two things land here (j'ai + the -é ending). Introduce the -é first, then attach j'ai. One step at a time."
+    }
+  ]
+}
