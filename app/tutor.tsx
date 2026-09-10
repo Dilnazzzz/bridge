@@ -11,6 +11,52 @@ type Progress = { idx: number; masteredIds: string[] };
 const WORDS_KEY = 'bridge.words.v1';
 const PROGRESS_KEY = 'bridge.progress.v1';
 const VOICE_KEY = 'bridge.voice.v1';
+const VOICE_PREFS_KEY = 'bridge.voiceprefs.v1';
+
+const REGION_MAP: Record<string, string> = {
+  en: 'en-US', fr: 'fr-FR', es: 'es-ES', de: 'de-DE', it: 'it-IT',
+  pt: 'pt-PT', ja: 'ja-JP', ko: 'ko-KR', zh: 'zh-CN',
+};
+
+function regionalize(code: string): string {
+  const lc = code.toLowerCase();
+  return REGION_MAP[lc] ?? (lc.length === 2 ? `${lc}-${lc.toUpperCase()}` : code);
+}
+
+function normLang(lang: string): string {
+  return lang.toLowerCase().replace('_', '-');
+}
+
+// macOS exposes many novelty voices (Eddy, Grandma, Bells…) that often sort
+// first; rank real voices above them and prefer enhanced/regional matches.
+function rankVoice(v: SpeechSynthesisVoice, code: string): number {
+  let score = 0;
+  const name = v.name.toLowerCase();
+  const lang = normLang(v.lang);
+  if (lang === normLang(regionalize(code))) score += 4;
+  else if (lang.startsWith(code.toLowerCase())) score += 2;
+  if (/enhanced|premium|natural|neural/.test(name)) score += 3;
+  if (name.includes('google')) score += 3;
+  if (v.localService) score += 1;
+  if (/albert|bad news|bahh|bells|boing|bubbles|cellos|organ|superstar|trinoids|whisper|wobble|zarvox|jester|grandma|grandpa|rocko|shelley|eddy|flo|reed|sandy|fred|junior|kathy|ralph/.test(name)) score -= 8;
+  return score;
+}
+
+function languageName(code: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+function loadVoicePrefs(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(VOICE_PREFS_KEY) ?? '{}') as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
 
 function loadWords(): Record<string, WordEntry> {
   try {
@@ -87,8 +133,12 @@ export default function Tutor({
   const [voiceOn, setVoiceOn] = useState(true);
   const [recording, setRecording] = useState(false);
   const [micSupported, setMicSupported] = useState(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voicePrefs, setVoicePrefs] = useState<Record<string, string>>({});
+  const [showVoices, setShowVoices] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const voicePrefsRef = useRef<Record<string, string>>({});
   const voiceOnRef = useRef(true);
   const recRef = useRef<Recognition | null>(null);
 
@@ -103,12 +153,17 @@ export default function Tutor({
       }
     } catch {}
     setMicSupported(getRecognitionCtor() !== null);
+    const prefs = loadVoicePrefs();
+    setVoicePrefs(prefs);
+    voicePrefsRef.current = prefs;
   }, []);
 
   useEffect(() => {
     if (!speechAvailable()) return;
     const load = () => {
-      voicesRef.current = window.speechSynthesis.getVoices();
+      const list = window.speechSynthesis.getVoices();
+      voicesRef.current = list;
+      setVoices(list);
     };
     load();
     window.speechSynthesis.addEventListener('voiceschanged', load);
@@ -119,13 +174,42 @@ export default function Tutor({
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
   }, [messages, loading]);
 
-  function pickVoice(lang: string): SpeechSynthesisVoice | undefined {
-    const lc = lang.toLowerCase();
-    const voices = voicesRef.current;
-    return (
-      voices.find((v) => v.lang.toLowerCase() === lc) ??
-      voices.find((v) => v.lang.toLowerCase().startsWith(lc))
-    );
+  function pickVoice(code: string): SpeechSynthesisVoice | undefined {
+    const list = voicesRef.current;
+    const pref = voicePrefsRef.current[code];
+    if (pref) {
+      const chosen = list.find((v) => v.name === pref);
+      if (chosen) return chosen;
+    }
+    const lc = code.toLowerCase();
+    return list
+      .filter((v) => normLang(v.lang).startsWith(lc))
+      .sort((a, b) => rankVoice(b, code) - rankVoice(a, code))[0];
+  }
+
+  function setVoicePref(code: string, name: string) {
+    const next = { ...voicePrefsRef.current };
+    if (name) next[code] = name;
+    else delete next[code];
+    voicePrefsRef.current = next;
+    setVoicePrefs(next);
+    try {
+      localStorage.setItem(VOICE_PREFS_KEY, JSON.stringify(next));
+    } catch {}
+  }
+
+  function previewVoice(code: string) {
+    if (!speechAvailable()) return;
+    window.speechSynthesis.cancel();
+    const sample = code.toLowerCase().startsWith('fr')
+      ? "Bonjour ! C'est possible, c'est important."
+      : 'Hello! This is how I sound.';
+    const u = new SpeechSynthesisUtterance(sample);
+    const voice = pickVoice(code);
+    if (voice) u.voice = voice;
+    u.lang = voice?.lang ?? regionalize(code);
+    u.rate = code === language.to ? 0.85 : 1;
+    window.speechSynthesis.speak(u);
   }
 
   function speak(segments?: Seg[]) {
@@ -150,9 +234,9 @@ export default function Tutor({
     if (!Ctor) return;
     if (speechAvailable()) window.speechSynthesis.cancel();
     const rec = new Ctor();
-    // Regionalize a bare 2-letter code (fr -> fr-FR); recognition of the
-    // target language is the point — known-language answers can be typed.
-    rec.lang = language.to.length === 2 ? `${language.to}-${language.to.toUpperCase()}` : language.to;
+    // Recognition listens in the target language — that's the skill being
+    // trained; known-language answers can be typed.
+    rec.lang = regionalize(language.to);
     rec.interimResults = true;
     rec.continuous = false;
     rec.onresult = (e) => {
@@ -330,6 +414,13 @@ export default function Tutor({
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
+            onClick={() => setShowVoices((s) => !s)}
+            title="Choose voices"
+            style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: showVoices ? '#111' : '#fafafa', color: showVoices ? '#fff' : '#333', cursor: 'pointer' }}
+          >
+            ⚙
+          </button>
+          <button
             onClick={toggleVoice}
             title={voiceOn ? 'Voice on — click to mute' : 'Voice off — click to unmute'}
             style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: '#fafafa', color: '#333', cursor: 'pointer' }}
@@ -344,6 +435,42 @@ export default function Tutor({
           </button>
         </div>
       </div>
+      {showVoices && (
+        <div style={{ border: '1px solid #eee', borderRadius: 10, padding: '12px 14px', marginBottom: 8, fontSize: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[language.to, language.from].map((code) => {
+            const options = voices
+              .filter((v) => normLang(v.lang).startsWith(code.toLowerCase()))
+              .sort((a, b) => rankVoice(b, code) - rankVoice(a, code));
+            return (
+              <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 100, color: '#555', flexShrink: 0 }}>{languageName(code)} voice</span>
+                <select
+                  value={voicePrefs[code] ?? ''}
+                  onChange={(e) => setVoicePref(code, e.target.value)}
+                  style={{ flex: 1, minWidth: 0, padding: '6px 8px', borderRadius: 6, border: '1px solid #ccc', fontSize: 14, background: '#fff', color: '#111' }}
+                >
+                  <option value="">Auto{options[0] ? ` — ${options[0].name}` : ' — no voice found'}</option>
+                  {options.map((v) => (
+                    <option key={v.name + v.lang} value={v.name}>
+                      {v.name} ({v.lang}{v.localService ? '' : ', online'})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => previewVoice(code)}
+                  title="Preview this voice"
+                  style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fafafa', cursor: 'pointer' }}
+                >
+                  🔈
+                </button>
+              </div>
+            );
+          })}
+          <div style={{ color: '#999', fontSize: 12, lineHeight: 1.5 }}>
+            No good {languageName(language.to)} option? In Chrome, pick a &quot;Google&quot; voice — no download needed. To add system voices on a Mac: System Settings → Accessibility → Spoken Content → System voice → choose &quot;Manage Voices…&quot; from the voice dropdown (on older macOS, click the ⓘ next to the voice) → search the language → download an &quot;Enhanced&quot; or &quot;Premium&quot; voice → quit and reopen the browser.
+          </div>
+        </div>
+      )}
       {showWords && (
         <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #eee', borderRadius: 10, padding: '10px 14px', marginBottom: 8, fontSize: 14 }}>
           {wordCount === 0 ? (
