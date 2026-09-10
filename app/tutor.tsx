@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-type Msg = { role: 'user' | 'assistant'; content: string };
+type Seg = { lang: string; text: string };
+type Msg = { role: 'user' | 'assistant'; content: string; segments?: Seg[] };
 type C = { id: string; title: string };
 type WordEntry = { word: string; constructionId: string; firstSeen: string; timesProduced: number };
 type Progress = { idx: number; masteredIds: string[] };
 
 const WORDS_KEY = 'bridge.words.v1';
 const PROGRESS_KEY = 'bridge.progress.v1';
+const VOICE_KEY = 'bridge.voice.v1';
 
 function loadWords(): Record<string, WordEntry> {
   try {
@@ -39,7 +41,17 @@ function saveProgress(p: Progress) {
   } catch {}
 }
 
-export default function Tutor({ constructions }: { constructions: C[] }) {
+function speechAvailable() {
+  return typeof window !== 'undefined' && 'speechSynthesis' in window;
+}
+
+export default function Tutor({
+  constructions,
+  language,
+}: {
+  constructions: C[];
+  language: { from: string; to: string };
+}) {
   const [started, setStarted] = useState(false);
   const [idx, setIdx] = useState(0);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -48,24 +60,85 @@ export default function Tutor({ constructions }: { constructions: C[] }) {
   const [words, setWords] = useState<Record<string, WordEntry>>({});
   const [showWords, setShowWords] = useState(false);
   const [resume, setResume] = useState<Progress | null>(null);
+  const [voiceOn, setVoiceOn] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const voiceOnRef = useRef(true);
 
   useEffect(() => {
     setWords(loadWords());
     setResume(loadProgress());
+    try {
+      const v = localStorage.getItem(VOICE_KEY);
+      if (v !== null) {
+        setVoiceOn(v === '1');
+        voiceOnRef.current = v === '1';
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!speechAvailable()) return;
+    const load = () => {
+      voicesRef.current = window.speechSynthesis.getVoices();
+    };
+    load();
+    window.speechSynthesis.addEventListener('voiceschanged', load);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
   }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
   }, [messages, loading]);
 
+  function pickVoice(lang: string): SpeechSynthesisVoice | undefined {
+    const lc = lang.toLowerCase();
+    const voices = voicesRef.current;
+    return (
+      voices.find((v) => v.lang.toLowerCase() === lc) ??
+      voices.find((v) => v.lang.toLowerCase().startsWith(lc))
+    );
+  }
+
+  function speak(segments?: Seg[]) {
+    if (!segments?.length || !voiceOnRef.current || !speechAvailable()) return;
+    window.speechSynthesis.cancel();
+    for (const seg of segments) {
+      const u = new SpeechSynthesisUtterance(seg.text);
+      const voice = pickVoice(seg.lang);
+      if (voice) u.voice = voice;
+      u.lang = voice?.lang ?? seg.lang;
+      u.rate = seg.lang === language.to ? 0.85 : 1;
+      window.speechSynthesis.speak(u);
+    }
+  }
+
+  function toggleVoice() {
+    const next = !voiceOn;
+    setVoiceOn(next);
+    voiceOnRef.current = next;
+    try {
+      localStorage.setItem(VOICE_KEY, next ? '1' : '0');
+    } catch {}
+    if (!next && speechAvailable()) window.speechSynthesis.cancel();
+  }
+
   async function post(constructionId: string, history: Msg[]) {
     const res = await fetch('/api/tutor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ constructionId, messages: history }),
+      body: JSON.stringify({
+        constructionId,
+        messages: history.map((m) => ({ role: m.role, content: m.content })),
+      }),
     });
-    return res.json() as Promise<{ reply?: string; mastered?: boolean; words?: string[]; error?: string }>;
+    return res.json() as Promise<{
+      reply?: string;
+      mastered?: boolean;
+      words?: string[];
+      segments?: Seg[];
+      error?: string;
+    }>;
   }
 
   function bankWords(newWords: string[], constructionId: string) {
@@ -103,7 +176,8 @@ export default function Tutor({ constructions }: { constructions: C[] }) {
     setLoading(true);
     try {
       const data = await post(constructions[atIdx].id, seed);
-      setMessages([...seed, { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}` }]);
+      setMessages([...seed, { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}`, segments: data.segments }]);
+      speak(data.segments);
     } catch {
       setMessages([...seed, { role: 'assistant', content: '⚠ Could not reach the tutor.' }]);
     } finally {
@@ -114,13 +188,14 @@ export default function Tutor({ constructions }: { constructions: C[] }) {
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
-    const history = [...messages, { role: 'user' as const, content: text }];
+    const history: Msg[] = [...messages, { role: 'user', content: text }];
     setMessages(history);
     setInput('');
     setLoading(true);
     try {
       const data = await post(constructions[idx].id, history);
-      setMessages([...history, { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}` }]);
+      setMessages([...history, { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}`, segments: data.segments }]);
+      speak(data.segments);
       bankWords(data.words ?? [], constructions[idx].id);
       if (data.mastered) {
         recordMastery(idx);
@@ -198,12 +273,21 @@ export default function Tutor({ constructions }: { constructions: C[] }) {
           <div style={{ fontSize: 13, color: '#888' }}>Lesson {idx + 1} of {constructions.length}</div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>{constructions[idx].title}</div>
         </div>
-        <button
-          onClick={() => setShowWords((s) => !s)}
-          style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: showWords ? '#111' : '#fafafa', color: showWords ? '#fff' : '#333', cursor: 'pointer' }}
-        >
-          ★ {wordCount} {wordCount === 1 ? 'word' : 'words'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={toggleVoice}
+            title={voiceOn ? 'Voice on — click to mute' : 'Voice off — click to unmute'}
+            style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: '#fafafa', color: '#333', cursor: 'pointer' }}
+          >
+            {voiceOn ? '🔊' : '🔇'}
+          </button>
+          <button
+            onClick={() => setShowWords((s) => !s)}
+            style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: showWords ? '#111' : '#fafafa', color: showWords ? '#fff' : '#333', cursor: 'pointer' }}
+          >
+            ★ {wordCount} {wordCount === 1 ? 'word' : 'words'}
+          </button>
+        </div>
       </div>
       {showWords && (
         <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #eee', borderRadius: 10, padding: '10px 14px', marginBottom: 8, fontSize: 14 }}>
@@ -224,7 +308,22 @@ export default function Tutor({ constructions }: { constructions: C[] }) {
       )}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
         {visible.map((m, i) => (
-          <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', padding: '10px 14px', borderRadius: 14, background: m.role === 'user' ? '#111' : '#f2f2f2', color: m.role === 'user' ? '#fff' : '#111', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+          <div
+            key={i}
+            onClick={m.role === 'assistant' && m.segments?.length ? () => speak(m.segments) : undefined}
+            title={m.role === 'assistant' && m.segments?.length ? 'Click to hear it again' : undefined}
+            style={{
+              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+              maxWidth: '80%',
+              padding: '10px 14px',
+              borderRadius: 14,
+              background: m.role === 'user' ? '#111' : '#f2f2f2',
+              color: m.role === 'user' ? '#fff' : '#111',
+              whiteSpace: 'pre-wrap',
+              lineHeight: 1.5,
+              cursor: m.role === 'assistant' && m.segments?.length ? 'pointer' : 'default',
+            }}
+          >
             {m.content}
           </div>
         ))}

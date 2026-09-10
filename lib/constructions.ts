@@ -27,6 +27,10 @@ export function getConstructions(): Construction[] {
   return load().constructions;
 }
 
+export function getLanguage(): { from: string; to: string } {
+  return load().language;
+}
+
 export function getConstruction(id: string): Construction | undefined {
   return load().constructions.find((c) => c.id === id);
 }

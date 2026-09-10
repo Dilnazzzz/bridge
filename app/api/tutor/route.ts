@@ -2,11 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'node:fs';
 import path from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
-import { getConstruction } from '@/lib/constructions';
+import { getConstruction, getLanguage } from '@/lib/constructions';
 
 const client = new Anthropic();
 
 type IncomingMessage = { role: 'user' | 'assistant'; content: string };
+type Segment = { lang: string; text: string };
+
+// Split a reply into spoken-language segments: text inside «…» is the target
+// language, everything else is the learner's known language.
+function toSegments(text: string, from: string, to: string): Segment[] {
+  const segments: Segment[] = [];
+  const re = /«([^»]*)»/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) segments.push({ lang: from, text: text.slice(last, m.index) });
+    segments.push({ lang: to, text: m[1] });
+    last = re.lastIndex;
+  }
+  if (last < text.length) segments.push({ lang: from, text: text.slice(last) });
+  return segments.filter((s) => /\p{L}/u.test(s.text));
+}
 
 function buildSystemPrompt(constructionId: string): string {
   const template = fs.readFileSync(path.join(process.cwd(), 'data', 'tutor-prompt.md'), 'utf-8');
@@ -38,14 +55,16 @@ export async function POST(req: NextRequest) {
     const mastered = raw.includes('[MASTERED]');
     const wordsMatch = raw.match(/\[WORDS:([^\]]*)\]/);
     const words = wordsMatch
-      ? wordsMatch[1].split('|').map((w) => w.trim()).filter(Boolean)
+      ? wordsMatch[1].split('|').map((w) => w.replace(/[«»]/g, '').trim()).filter(Boolean)
       : [];
     const reply = raw
       .replace(/\[WORDS:[^\]]*\]/g, '')
       .replace('[MASTERED]', '')
       .trim();
+    const lang = getLanguage();
+    const segments = toSegments(reply, lang.from, lang.to);
 
-    return NextResponse.json({ reply, mastered, words });
+    return NextResponse.json({ reply, mastered, words, segments });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error(err);
