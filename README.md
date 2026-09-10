@@ -1,5 +1,7 @@
 # Bridge
 
+![CI](https://github.com/Dilnazzzz/bridge/actions/workflows/ci.yml/badge.svg)
+
 Learn a new language through the ones you already speak.
 
 ![Bridge — onboarding screen showing your cognate head start](public/screenshot.png)
@@ -48,13 +50,46 @@ Open [http://localhost:3000](http://localhost:3000).
 
 The header shows which lesson you're on. When you master a construction, the next one begins on its own.
 
-## Tests
+## Tests & evals
 
 ```bash
-npm test
+npm test       # unit + eval-harness tests (no API key needed)
+npm run evals  # live pedagogy evals against the real tutor (needs ANTHROPIC_API_KEY)
 ```
 
-Vitest suite covering the spaced-repetition scheduler (growth, lapses, key normalization), the syllabus graph unlocking, the session planner (due-word selection, error ranking, checkpoint cadence), persistence, and bilingual reply segmentation.
+Vitest covers the spaced-repetition scheduler (growth, lapses, key normalization), the syllabus graph unlocking, the session planner (due-word selection, error ranking, checkpoint cadence), persistence, and bilingual reply segmentation.
+
+Because the tutor is an LLM, there's also an **eval harness** (`evals/`) that encodes the pedagogy invariants a turn must satisfy — plain-text formatting, mastery only on correct independent production, correct error tagging, pronunciation judged by sound not spelling, never giving away the answer — and scores the shipped model against them. See [`evals/README.md`](evals/README.md).
+
+## MCP server
+
+Bridge ships a [Model Context Protocol](https://modelcontextprotocol.io) server (`mcp/server.mjs`) that exposes a learner's state as tools any MCP client — Claude Desktop, an IDE, an agent — can call:
+
+| Tool | What it returns |
+|---|---|
+| `list_lessons` | the ordered curriculum, each marked mastered / current / locked |
+| `get_lesson` | one construction's full scaffold (goal, transfer hook, pattern, examples) |
+| `word_bank` | every word the learner produced, with meaning and review-due status |
+| `progress` | current lesson, mastery count, words owned, words due, last checkpoint |
+| `reading_coverage` | for a pasted passage: % readable, split into produced / cognate / new words |
+
+Run it over stdio:
+
+```bash
+npm run mcp
+```
+
+Wire it into an MCP client (e.g. Claude Desktop's `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "bridge": { "command": "node", "args": ["/absolute/path/to/bridge/mcp/server.mjs"] }
+  }
+}
+```
+
+The server is read-only and self-contained — it reads the same `data/` and `.data/` files the app uses, with no database.
 
 ## Adding a language pair
 
