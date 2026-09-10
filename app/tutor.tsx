@@ -45,6 +45,30 @@ function speechAvailable() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
 
+// SpeechRecognition is not in TypeScript's DOM lib yet — minimal local types.
+type RecognitionEvent = {
+  results: { length: number; [i: number]: { 0: { transcript: string } } };
+};
+type Recognition = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((e: RecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+function getRecognitionCtor(): (new () => Recognition) | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as {
+    SpeechRecognition?: new () => Recognition;
+    webkitSpeechRecognition?: new () => Recognition;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
 export default function Tutor({
   constructions,
   language,
@@ -61,9 +85,12 @@ export default function Tutor({
   const [showWords, setShowWords] = useState(false);
   const [resume, setResume] = useState<Progress | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [recording, setRecording] = useState(false);
+  const [micSupported, setMicSupported] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const voiceOnRef = useRef(true);
+  const recRef = useRef<Recognition | null>(null);
 
   useEffect(() => {
     setWords(loadWords());
@@ -75,6 +102,7 @@ export default function Tutor({
         voiceOnRef.current = v === '1';
       }
     } catch {}
+    setMicSupported(getRecognitionCtor() !== null);
   }, []);
 
   useEffect(() => {
@@ -111,6 +139,32 @@ export default function Tutor({
       u.rate = seg.lang === language.to ? 0.85 : 1;
       window.speechSynthesis.speak(u);
     }
+  }
+
+  function toggleMic() {
+    if (recording) {
+      recRef.current?.stop();
+      return;
+    }
+    const Ctor = getRecognitionCtor();
+    if (!Ctor) return;
+    if (speechAvailable()) window.speechSynthesis.cancel();
+    const rec = new Ctor();
+    // Regionalize a bare 2-letter code (fr -> fr-FR); recognition of the
+    // target language is the point — known-language answers can be typed.
+    rec.lang = language.to.length === 2 ? `${language.to}-${language.to.toUpperCase()}` : language.to;
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onresult = (e) => {
+      let text = '';
+      for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      setInput(text);
+    };
+    rec.onend = () => setRecording(false);
+    rec.onerror = () => setRecording(false);
+    recRef.current = rec;
+    setRecording(true);
+    rec.start();
   }
 
   function toggleVoice() {
@@ -188,6 +242,7 @@ export default function Tutor({
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
+    if (recording) recRef.current?.stop();
     const history: Msg[] = [...messages, { role: 'user', content: text }];
     setMessages(history);
     setInput('');
@@ -330,12 +385,29 @@ export default function Tutor({
         {loading && <div style={{ alignSelf: 'flex-start', color: '#aaa', fontStyle: 'italic' }}>…</div>}
       </div>
       <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
+        {micSupported && (
+          <button
+            onClick={toggleMic}
+            title={recording ? 'Listening — click to stop' : 'Speak your French answer'}
+            style={{
+              padding: '12px 16px',
+              fontSize: 16,
+              borderRadius: 8,
+              border: recording ? '1px solid #c00' : '1px solid #ccc',
+              background: recording ? '#c00' : '#fafafa',
+              color: recording ? '#fff' : '#333',
+              cursor: 'pointer',
+            }}
+          >
+            🎤
+          </button>
+        )}
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
-          placeholder="Say it in French…"
-          style={{ flex: 1, padding: '12px 14px', fontSize: 16, borderRadius: 8, border: '1px solid #ccc' }}
+          placeholder={recording ? 'Listening — speak French…' : 'Say it in French…'}
+          style={{ flex: 1, padding: '12px 14px', fontSize: 16, borderRadius: 8, border: recording ? '1px solid #c00' : '1px solid #ccc' }}
         />
         <button onClick={send} disabled={loading} style={{ padding: '12px 18px', fontSize: 16, borderRadius: 8, border: '1px solid #111', background: '#111', color: '#fff', cursor: 'pointer' }}>
           Send

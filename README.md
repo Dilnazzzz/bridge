@@ -34,8 +34,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Click **Start**.
 2. Answer the tutor's questions in the chat — in the language you know at first, in growing amounts of the new one as you go.
-3. Say your answers out loud before you send them; pronunciation is part of the point.
-4. Don't fish for the answer. The tutor won't give it — one more honest guess usually gets you there, and that's by design.
+3. Say your answers out loud before you send them; pronunciation is part of the point. The tutor's replies are spoken aloud too — French in a French voice — via the 🔊 toggle, and clicking any tutor message replays it.
+4. Or answer by voice: press 🎤 and speak your French. What the browser heard lands in the input box so you can check it before sending — if the transcript is mangled, your pronunciation probably needs another try, which is useful feedback in itself. (Voice input works in Chrome, Edge, and Safari.)
+5. Don't fish for the answer. The tutor won't give it — one more honest guess usually gets you there, and that's by design.
 
 The header shows which lesson you're on. When you master a construction, the next one begins on its own.
 
