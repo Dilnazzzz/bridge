@@ -16,7 +16,7 @@ The first bridge shipped here is **English → French**, where the head start is
 - A tutor prompt (`data/tutor-prompt.md`) that enforces the method: one guiding question per turn, respond to the learner's actual answer, never lecture, never hand over the solution.
 - When you produce a construction's target correctly on your own, the lesson advances automatically.
 
-There are no accounts and no database — refresh the page to start over.
+- Every word you produce correctly is banked in a **word bank** (★ counter in the header), and your lesson progress is remembered — both live in your browser (localStorage), so there are no accounts and no server database. Coming back later resumes where you left off; **Start over** wipes the slate.
 
 ## Setup
 

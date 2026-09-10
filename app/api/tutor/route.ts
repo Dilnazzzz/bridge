@@ -36,9 +36,16 @@ export async function POST(req: NextRequest) {
     const textBlock = msg.content.find((b) => b.type === 'text');
     const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
     const mastered = raw.includes('[MASTERED]');
-    const reply = raw.replace('[MASTERED]', '').trim();
+    const wordsMatch = raw.match(/\[WORDS:([^\]]*)\]/);
+    const words = wordsMatch
+      ? wordsMatch[1].split('|').map((w) => w.trim()).filter(Boolean)
+      : [];
+    const reply = raw
+      .replace(/\[WORDS:[^\]]*\]/g, '')
+      .replace('[MASTERED]', '')
+      .trim();
 
-    return NextResponse.json({ reply, mastered });
+    return NextResponse.json({ reply, mastered, words });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error(err);
