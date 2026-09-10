@@ -124,12 +124,28 @@ function getRecognitionCtor(): (new () => Recognition) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+type HeadStart = {
+  total: number;
+  scopeTotal: number;
+  clusters: { type: string; count: number; examples: string[] }[];
+  words: string[];
+};
+
+function clusterLabel(type: string): string {
+  if (type === 'identical') return 'spelled the same';
+  if (type === 'accent-only') return 'accents aside';
+  if (type === 'near') return 'nearly the same';
+  return type.replace('rule:', '');
+}
+
 export default function Tutor({
   constructions,
   language,
+  headStart,
 }: {
   constructions: C[];
   language: { from: string; to: string };
+  headStart: HeadStart | null;
 }) {
   const [started, setStarted] = useState(false);
   const [idx, setIdx] = useState(0);
@@ -467,15 +483,42 @@ export default function Tutor({
   const visible = messages.filter((m, i) => !(i === 0 && m.content === "Let's begin."));
   const wordList = Object.values(words).sort((a, b) => (a.firstSeen < b.firstSeen ? 1 : -1));
   const wordCount = wordList.length;
+  const producedTokens = new Set<string>();
+  for (const w of wordList) {
+    for (const t of w.word.toLowerCase().split(/[^a-zàâäéèêëîïôöùûüçœæ'-]+/)) {
+      if (t) producedTokens.add(t);
+    }
+  }
+  const networkCovered = headStart ? headStart.words.filter((f) => producedTokens.has(f)).length : 0;
   const canResume = resume !== null && (resume.idx > 0 || resume.masteredIds.length > 0);
 
   if (!started) {
     return (
       <main style={{ maxWidth: 640, margin: '0 auto', padding: '4rem 1.5rem', fontFamily: 'system-ui, sans-serif' }}>
         <h1 style={{ fontSize: 28, fontWeight: 600 }}>Bridge</h1>
-        <p style={{ fontSize: 18, lineHeight: 1.6, color: '#333' }}>
-          You already recognize thousands of French words — the ones ending in -tion, -able, -ent are nearly the same. This tutor won&apos;t give you answers. It will ask you questions until you build French yourself.
-        </p>
+        {headStart ? (
+          <>
+            <p style={{ fontSize: 18, lineHeight: 1.6, color: '#333' }}>
+              Of the {headStart.scopeTotal.toLocaleString()} most common French words,{' '}
+              <strong>you can already read about {headStart.total.toLocaleString()}</strong> — they&apos;re the same words English borrowed or shares. This tutor won&apos;t give you answers. It will ask you questions until you build French yourself.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+              {headStart.clusters.map((c) => (
+                <span
+                  key={c.type}
+                  title={c.examples.join(', ')}
+                  style={{ fontSize: 13, padding: '4px 10px', borderRadius: 999, background: '#f2f2f2', color: '#444' }}
+                >
+                  {clusterLabel(c.type)} · {c.count.toLocaleString()}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p style={{ fontSize: 18, lineHeight: 1.6, color: '#333' }}>
+            You already recognize thousands of French words — the ones ending in -tion, -able, -ent are nearly the same. This tutor won&apos;t give you answers. It will ask you questions until you build French yourself.
+          </p>
+        )}
         {canResume && (
           <p style={{ marginTop: 16, fontSize: 15, color: '#555' }}>
             Welcome back — you own {wordCount} {wordCount === 1 ? 'word' : 'words'} and you&apos;re on lesson {resume.idx + 1} of {constructions.length}.
@@ -601,6 +644,11 @@ export default function Tutor({
                 </span>
               </div>
             ))
+          )}
+          {headStart && (
+            <div style={{ color: '#999', fontSize: 12, paddingTop: 6 }}>
+              Cognate network: {networkCovered} of {Math.min(headStart.words.length, headStart.total).toLocaleString()} instant-transfer words produced so far.
+            </div>
           )}
         </div>
       )}
