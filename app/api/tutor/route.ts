@@ -8,6 +8,7 @@ const client = new Anthropic();
 
 type IncomingMessage = { role: 'user' | 'assistant'; content: string };
 type Segment = { lang: string; text: string };
+type KnownWord = { word: string; gloss?: string };
 
 // Split a reply into spoken-language segments: text inside «…» is the target
 // language, everything else is the learner's known language.
@@ -36,12 +37,20 @@ function buildSystemPrompt(constructionId: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { constructionId, messages } = (await req.json()) as {
+    const { constructionId, messages, knownWords } = (await req.json()) as {
       constructionId: string;
       messages: IncomingMessage[];
+      knownWords?: KnownWord[];
     };
 
-    const system = buildSystemPrompt(constructionId);
+    let system = buildSystemPrompt(constructionId);
+    if (knownWords?.length) {
+      const bank = knownWords
+        .slice(0, 20)
+        .map((k) => `- «${k.word}»${k.gloss ? ` = ${k.gloss}` : ''}`)
+        .join('\n');
+      system += `\n\nWORD BANK — items the learner has already produced on their own, least recently practiced first:\n${bank}\n\nTest recall often. When a lesson is just beginning, open with a quick warm-up: ask the learner to produce two or three of these from their meanings, one at a time, before introducing anything new. After that, roughly every third turn, weave one quick recall test from this bank into the conversation before continuing. Prefer items near the top of the list.`;
+    }
 
     const msg = await client.messages.create({
       model: 'claude-sonnet-5',
@@ -54,8 +63,16 @@ export async function POST(req: NextRequest) {
     const raw = textBlock && textBlock.type === 'text' ? textBlock.text : '';
     const mastered = raw.includes('[MASTERED]');
     const wordsMatch = raw.match(/\[WORDS:([^\]]*)\]/);
-    const words = wordsMatch
-      ? wordsMatch[1].split('|').map((w) => w.replace(/[«»]/g, '').trim()).filter(Boolean)
+    const words: KnownWord[] = wordsMatch
+      ? wordsMatch[1]
+          .split('|')
+          .map((pair) => {
+            const eq = pair.indexOf('=');
+            const w = (eq >= 0 ? pair.slice(0, eq) : pair).replace(/[«»]/g, '').trim();
+            const g = eq >= 0 ? pair.slice(eq + 1).replace(/[«»]/g, '').trim() : '';
+            return { word: w, gloss: g || undefined };
+          })
+          .filter((k) => k.word)
       : [];
     const reply = raw
       .replace(/\[WORDS:[^\]]*\]/g, '')

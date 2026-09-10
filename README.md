@@ -16,7 +16,8 @@ The first bridge shipped here is **English → French**, where the head start is
 - A tutor prompt (`data/tutor-prompt.md`) that enforces the method: one guiding question per turn, respond to the learner's actual answer, never lecture, never hand over the solution.
 - When you produce a construction's target correctly on your own, the lesson advances automatically.
 
-- Every word you produce correctly is banked in a **word bank** (★ counter in the header), and your lesson progress is remembered — both live in your browser (localStorage), so there are no accounts and no server database. Coming back later resumes where you left off; **Start over** wipes the slate.
+- Every word you produce correctly is banked in a **word bank** (★ counter in the header) with its meaning, and your lesson progress is remembered — both live in your browser (localStorage), so there are no accounts and no server database. Coming back later resumes where you left off; **Start over** wipes the slate.
+- The tutor **tests you constantly**: each lesson opens with a rapid warm-up on your least-recently-practiced words, and every few turns it weaves in another quick recall check. Producing a word again refreshes its place in the queue — lightweight spaced repetition, by conversation instead of flashcards.
 
 ## Setup
 
@@ -36,7 +37,8 @@ Open [http://localhost:3000](http://localhost:3000).
 2. Answer the tutor's questions in the chat — in the language you know at first, in growing amounts of the new one as you go.
 3. Say your answers out loud before you send them; pronunciation is part of the point. The tutor's replies are spoken aloud too — French in a French voice — via the 🔊 toggle, and clicking any tutor message replays it.
 4. Or answer by voice: press 🎤 and speak your French. What the browser heard lands in the input box so you can check it before sending — if the transcript is mangled, your pronunciation probably needs another try, which is useful feedback in itself. (Voice input works in Chrome, Edge, and Safari.)
-5. Don't fish for the answer. The tutor won't give it — one more honest guess usually gets you there, and that's by design.
+5. Fully hands-free, Language-Transfer-style: toggle **🎧**. The tutor speaks, then opens the mic by itself; say your answer and it sends when you pause — no typing in the loop at all. The status line shows whether it's speaking, listening, or thinking.
+6. Don't fish for the answer. The tutor won't give it — one more honest guess usually gets you there, and that's by design.
 
 The header shows which lesson you're on. When you master a construction, the next one begins on its own.
 

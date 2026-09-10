@@ -5,13 +5,22 @@ import { useEffect, useRef, useState } from 'react';
 type Seg = { lang: string; text: string };
 type Msg = { role: 'user' | 'assistant'; content: string; segments?: Seg[] };
 type C = { id: string; title: string };
-type WordEntry = { word: string; constructionId: string; firstSeen: string; timesProduced: number };
+type WordEntry = {
+  word: string;
+  gloss?: string;
+  constructionId: string;
+  firstSeen: string;
+  lastProduced?: string;
+  timesProduced: number;
+};
+type ApiWord = { word: string; gloss?: string };
 type Progress = { idx: number; masteredIds: string[] };
 
 const WORDS_KEY = 'bridge.words.v1';
 const PROGRESS_KEY = 'bridge.progress.v1';
 const VOICE_KEY = 'bridge.voice.v1';
 const VOICE_PREFS_KEY = 'bridge.voiceprefs.v1';
+const HANDSFREE_KEY = 'bridge.handsfree.v1';
 
 const REGION_MAP: Record<string, string> = {
   en: 'en-US', fr: 'fr-FR', es: 'es-ES', de: 'de-DE', it: 'it-IT',
@@ -136,20 +145,34 @@ export default function Tutor({
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voicePrefs, setVoicePrefs] = useState<Record<string, string>>({});
   const [showVoices, setShowVoices] = useState(false);
+  const [handsFree, setHandsFree] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const voicePrefsRef = useRef<Record<string, string>>({});
   const voiceOnRef = useRef(true);
   const recRef = useRef<Recognition | null>(null);
+  const handsFreeRef = useRef(false);
+  const wordsRef = useRef<Record<string, WordEntry>>({});
+  const transcriptRef = useRef('');
+  const speakIdRef = useRef(0);
+  const emptyListensRef = useRef(0);
 
   useEffect(() => {
-    setWords(loadWords());
+    const w = loadWords();
+    setWords(w);
+    wordsRef.current = w;
     setResume(loadProgress());
     try {
       const v = localStorage.getItem(VOICE_KEY);
       if (v !== null) {
         setVoiceOn(v === '1');
         voiceOnRef.current = v === '1';
+      }
+      const hf = localStorage.getItem(HANDSFREE_KEY);
+      if (hf !== null) {
+        setHandsFree(hf === '1');
+        handsFreeRef.current = hf === '1';
       }
     } catch {}
     setMicSupported(getRecognitionCtor() !== null);
@@ -212,24 +235,34 @@ export default function Tutor({
     window.speechSynthesis.speak(u);
   }
 
-  function speak(segments?: Seg[]) {
-    if (!segments?.length || !voiceOnRef.current || !speechAvailable()) return;
+  function speak(segments?: Seg[], after?: () => void) {
+    if (!segments?.length || !voiceOnRef.current || !speechAvailable()) {
+      after?.();
+      return;
+    }
     window.speechSynthesis.cancel();
-    for (const seg of segments) {
+    const id = ++speakIdRef.current;
+    setSpeaking(true);
+    const finish = () => {
+      if (id !== speakIdRef.current) return; // superseded by a newer speak()
+      setSpeaking(false);
+      after?.();
+    };
+    segments.forEach((seg, i) => {
       const u = new SpeechSynthesisUtterance(seg.text);
       const voice = pickVoice(seg.lang);
       if (voice) u.voice = voice;
       u.lang = voice?.lang ?? seg.lang;
       u.rate = seg.lang === language.to ? 0.85 : 1;
+      if (i === segments.length - 1) {
+        u.onend = finish;
+        u.onerror = finish;
+      }
       window.speechSynthesis.speak(u);
-    }
+    });
   }
 
-  function toggleMic() {
-    if (recording) {
-      recRef.current?.stop();
-      return;
-    }
+  function startRecognition() {
     const Ctor = getRecognitionCtor();
     if (!Ctor) return;
     if (speechAvailable()) window.speechSynthesis.cancel();
@@ -239,16 +272,54 @@ export default function Tutor({
     rec.lang = regionalize(language.to);
     rec.interimResults = true;
     rec.continuous = false;
+    transcriptRef.current = '';
     rec.onresult = (e) => {
       let text = '';
       for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      transcriptRef.current = text;
       setInput(text);
     };
-    rec.onend = () => setRecording(false);
+    rec.onend = () => {
+      setRecording(false);
+      const heard = transcriptRef.current.trim();
+      if (!handsFreeRef.current) return;
+      if (heard) {
+        emptyListensRef.current = 0;
+        void sendText(heard);
+      } else if (emptyListensRef.current < 2) {
+        // heard nothing — listen again a couple of times before giving up
+        emptyListensRef.current += 1;
+        startRecognition();
+      } else {
+        emptyListensRef.current = 0;
+      }
+    };
     rec.onerror = () => setRecording(false);
     recRef.current = rec;
     setRecording(true);
     rec.start();
+  }
+
+  function toggleMic() {
+    if (recording) {
+      recRef.current?.stop();
+      return;
+    }
+    startRecognition();
+  }
+
+  function toggleHandsFree() {
+    const next = !handsFree;
+    setHandsFree(next);
+    handsFreeRef.current = next;
+    try {
+      localStorage.setItem(HANDSFREE_KEY, next ? '1' : '0');
+    } catch {}
+    if (next) {
+      if (!recording && !loading && !speaking) startRecognition();
+    } else if (recording) {
+      recRef.current?.stop();
+    }
   }
 
   function toggleVoice() {
@@ -261,6 +332,15 @@ export default function Tutor({
     if (!next && speechAvailable()) window.speechSynthesis.cancel();
   }
 
+  function bankForRequest(): ApiWord[] {
+    return Object.values(wordsRef.current)
+      .sort((a, b) =>
+        (a.lastProduced ?? a.firstSeen) < (b.lastProduced ?? b.firstSeen) ? -1 : 1,
+      )
+      .slice(0, 20)
+      .map((w) => ({ word: w.word, gloss: w.gloss }));
+  }
+
   async function post(constructionId: string, history: Msg[]) {
     const res = await fetch('/api/tutor', {
       method: 'POST',
@@ -268,31 +348,39 @@ export default function Tutor({
       body: JSON.stringify({
         constructionId,
         messages: history.map((m) => ({ role: m.role, content: m.content })),
+        knownWords: bankForRequest(),
       }),
     });
     return res.json() as Promise<{
       reply?: string;
       mastered?: boolean;
-      words?: string[];
+      words?: ApiWord[];
       segments?: Seg[];
       error?: string;
     }>;
   }
 
-  function bankWords(newWords: string[], constructionId: string) {
+  function bankWords(newWords: ApiWord[], constructionId: string) {
     if (!newWords.length) return;
     setWords((prev) => {
       const next = { ...prev };
-      for (const w of newWords) {
-        const key = w.trim().toLowerCase();
+      const now = new Date().toISOString();
+      for (const { word, gloss } of newWords) {
+        const key = word.trim().toLowerCase();
         if (!key) continue;
         if (next[key]) {
-          next[key] = { ...next[key], timesProduced: next[key].timesProduced + 1 };
+          next[key] = {
+            ...next[key],
+            gloss: gloss ?? next[key].gloss,
+            lastProduced: now,
+            timesProduced: next[key].timesProduced + 1,
+          };
         } else {
-          next[key] = { word: w.trim(), constructionId, firstSeen: new Date().toISOString(), timesProduced: 1 };
+          next[key] = { word: word.trim(), gloss, constructionId, firstSeen: now, lastProduced: now, timesProduced: 1 };
         }
       }
       saveWords(next);
+      wordsRef.current = next;
       return next;
     });
   }
@@ -315,7 +403,9 @@ export default function Tutor({
     try {
       const data = await post(constructions[atIdx].id, seed);
       setMessages([...seed, { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}`, segments: data.segments }]);
-      speak(data.segments);
+      speak(data.segments, () => {
+        if (handsFreeRef.current) startRecognition();
+      });
     } catch {
       setMessages([...seed, { role: 'assistant', content: '⚠ Could not reach the tutor.' }]);
     } finally {
@@ -323,10 +413,11 @@ export default function Tutor({
     }
   }
 
-  async function send() {
-    const text = input.trim();
+  async function sendText(raw: string) {
+    const text = raw.trim();
     if (!text || loading) return;
     if (recording) recRef.current?.stop();
+    transcriptRef.current = '';
     const history: Msg[] = [...messages, { role: 'user', content: text }];
     setMessages(history);
     setInput('');
@@ -334,13 +425,17 @@ export default function Tutor({
     try {
       const data = await post(constructions[idx].id, history);
       setMessages([...history, { role: 'assistant', content: data.reply ?? `⚠ ${data.error ?? 'error'}`, segments: data.segments }]);
-      speak(data.segments);
+      speak(data.segments, () => {
+        if (data.mastered) {
+          if (idx < constructions.length - 1) setTimeout(() => beginLesson(idx + 1), 800);
+        } else if (handsFreeRef.current) {
+          startRecognition();
+        }
+      });
       bankWords(data.words ?? [], constructions[idx].id);
       if (data.mastered) {
         recordMastery(idx);
-        if (idx < constructions.length - 1) {
-          setTimeout(() => beginLesson(idx + 1), 1400);
-        } else {
+        if (idx >= constructions.length - 1) {
           setMessages((m) => [
             ...m,
             { role: 'assistant', content: `🎉 That was the last lesson — you've worked through all ${constructions.length} constructions.` },
@@ -352,6 +447,10 @@ export default function Tutor({
     } finally {
       setLoading(false);
     }
+  }
+
+  function send() {
+    void sendText(input);
   }
 
   function startOver() {
@@ -413,6 +512,15 @@ export default function Tutor({
           <div style={{ fontSize: 16, fontWeight: 600 }}>{constructions[idx].title}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {micSupported && (
+            <button
+              onClick={toggleHandsFree}
+              title={handsFree ? 'Hands-free on — the tutor listens after speaking' : 'Hands-free off — click to converse by voice only'}
+              style={{ fontSize: 14, padding: '6px 12px', borderRadius: 999, border: '1px solid #ddd', background: handsFree ? '#111' : '#fafafa', color: handsFree ? '#fff' : '#333', cursor: 'pointer' }}
+            >
+              🎧
+            </button>
+          )}
           <button
             onClick={() => setShowVoices((s) => !s)}
             title="Choose voices"
@@ -435,6 +543,11 @@ export default function Tutor({
           </button>
         </div>
       </div>
+      {handsFree && (
+        <div style={{ fontSize: 13, color: '#888', padding: '6px 0', borderBottom: '1px solid #f5f5f5', marginBottom: 4 }}>
+          {loading ? '… thinking' : speaking ? '🔊 speaking — listen' : recording ? '🎤 listening — just answer out loud' : 'hands-free: tap 🎤 if I stop listening'}
+        </div>
+      )}
       {showVoices && (
         <div style={{ border: '1px solid #eee', borderRadius: 10, padding: '12px 14px', marginBottom: 8, fontSize: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[language.to, language.from].map((code) => {
@@ -477,9 +590,12 @@ export default function Tutor({
             <div style={{ color: '#888' }}>No words yet — they&apos;ll appear here as you produce French yourself.</div>
           ) : (
             wordList.map((w) => (
-              <div key={w.word} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #f5f5f5' }}>
-                <span style={{ fontWeight: 500 }}>{w.word}</span>
-                <span style={{ color: '#999' }}>
+              <div key={w.word} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '3px 0', borderBottom: '1px solid #f5f5f5' }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ fontWeight: 500 }}>{w.word}</span>
+                  {w.gloss && <span style={{ color: '#888' }}> — {w.gloss}</span>}
+                </span>
+                <span style={{ color: '#999', flexShrink: 0 }}>
                   {constructions.find((c) => c.id === w.constructionId)?.title ?? w.constructionId}
                   {w.timesProduced > 1 ? ` · ×${w.timesProduced}` : ''}
                 </span>
