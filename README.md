@@ -2,6 +2,8 @@
 
 Learn a new language through the ones you already speak.
 
+![Bridge — onboarding screen showing your cognate head start](public/screenshot.png)
+
 Bridge is a Socratic tutor that never gives you the answer. It asks you one small question at a time until you build the new language yourself — out of the words and structures your existing languages already gave you.
 
 ## Why this exists
@@ -40,10 +42,19 @@ Open [http://localhost:3000](http://localhost:3000).
 2. Answer the tutor's questions in the chat — in the language you know at first, in growing amounts of the new one as you go.
 3. Say your answers out loud before you send them; pronunciation is part of the point. The tutor's replies are spoken aloud too — French in a French voice — via the 🔊 toggle, and clicking any tutor message replays it.
 4. Or answer by voice: press 🎤 and speak your French. What the browser heard lands in the input box so you can check it before sending — if the transcript is mangled, your pronunciation probably needs another try, which is useful feedback in itself. (Voice input works in Chrome, Edge, and Safari.)
-5. Fully hands-free, Language-Transfer-style: toggle **🎧**. The tutor speaks, then opens the mic by itself; say your answer and it sends when you pause — no typing in the loop at all. The status line shows whether it's speaking, listening, or thinking.
-6. Don't fish for the answer. The tutor won't give it — one more honest guess usually gets you there, and that's by design.
+5. Fully hands-free, Language-Transfer-style: tap **"go hands-free"** under the input. The tutor speaks, then opens the mic by itself; say your answer and it sends when you pause — no typing in the loop at all. A big state button shows whether it's listening, speaking, or thinking; tap it to interrupt or re-listen.
+6. Explore the tabs: **Learn** is the tutor, **Story** generates comprehensible-input micro-stories from your words, **Read** analyzes any pasted French for readability, and **Progress** holds your word bank, checkpoint scores, and the 48-lesson syllabus map.
+7. Don't fish for the answer. The tutor won't give it — one more honest guess usually gets you there, and that's by design.
 
 The header shows which lesson you're on. When you master a construction, the next one begins on its own.
+
+## Tests
+
+```bash
+npm test
+```
+
+Vitest suite covering the spaced-repetition scheduler (growth, lapses, key normalization), the syllabus graph unlocking, the session planner (due-word selection, error ranking, checkpoint cadence), persistence, and bilingual reply segmentation.
 
 ## Adding a language pair
 

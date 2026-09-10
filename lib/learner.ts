@@ -33,7 +33,9 @@ export type LearnerState = {
   imported: boolean;
 };
 
-const FILE = path.join(process.cwd(), '.data', 'learner.json');
+// Overridable so tests can point the store at a temp directory.
+const DATA_DIR = () => process.env.BRIDGE_DATA_DIR ?? path.join(process.cwd(), '.data');
+const FILE = () => path.join(DATA_DIR(), 'learner.json');
 
 const EMPTY: LearnerState = {
   words: {},
@@ -47,7 +49,7 @@ const EMPTY: LearnerState = {
 
 export function loadLearner(): LearnerState {
   try {
-    return { ...EMPTY, ...(JSON.parse(fs.readFileSync(FILE, 'utf-8')) as LearnerState) };
+    return { ...EMPTY, ...(JSON.parse(fs.readFileSync(FILE(), 'utf-8')) as LearnerState) };
   } catch {
     return structuredClone(EMPTY);
   }
@@ -61,10 +63,11 @@ export function resetLearner(): LearnerState {
 }
 
 export function saveLearner(state: LearnerState) {
-  fs.mkdirSync(path.dirname(FILE), { recursive: true });
-  const tmp = FILE + '.tmp';
+  const file = FILE();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = file + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(state, null, 1));
-  fs.renameSync(tmp, FILE);
+  fs.renameSync(tmp, file);
 }
 
 // ---------------------------------------------------------------------------

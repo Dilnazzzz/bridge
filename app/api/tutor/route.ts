@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { getConstruction, getLanguage } from '@/lib/constructions';
+import { toSegments } from '@/lib/segments';
 import {
   buildPlan,
   loadLearner,
@@ -19,7 +20,6 @@ const client = new Anthropic();
 const MODEL = 'claude-sonnet-5';
 
 type IncomingMessage = { role: 'user' | 'assistant'; content: string };
-type Segment = { lang: string; text: string };
 
 const TurnSchema = z.object({
   reply: z.string().describe('Your conversational tutor reply, plain text, target-language spans wrapped in «guillemets».'),
@@ -67,22 +67,6 @@ function buildSystemPrompt(constructionId: string): string {
     ? `title: ${c.title}\ngoal: ${c.goal}\ntransferHook: ${c.transferHook}\ntargetPattern: ${c.targetPattern}\nexamples: ${c.examples.join(', ')}\nwatchFor: ${c.watchFor}`
     : 'No construction found.';
   return template.replace('{{CONSTRUCTION}}', block);
-}
-
-// Split a reply into spoken-language segments: text inside «…» is the target
-// language, everything else is the learner's known language.
-function toSegments(text: string, from: string, to: string): Segment[] {
-  const segments: Segment[] = [];
-  const re = /«([^»]*)»/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) segments.push({ lang: from, text: text.slice(last, m.index) });
-    segments.push({ lang: to, text: m[1] });
-    last = re.lastIndex;
-  }
-  if (last < text.length) segments.push({ lang: from, text: text.slice(last) });
-  return segments.filter((s) => /\p{L}/u.test(s.text));
 }
 
 export async function POST(req: NextRequest) {
