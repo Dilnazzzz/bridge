@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Parler",
-  description: "A Socratic, Thinking-Method French tutor for English speakers",
+  title: "Bridge",
+  description: "Learn a new language through the ones you already speak",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

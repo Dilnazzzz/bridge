@@ -66,7 +66,7 @@ export default function Tutor({ constructions }: { constructions: C[] }) {
   if (!started) {
     return (
       <main style={{ maxWidth: 640, margin: '0 auto', padding: '4rem 1.5rem', fontFamily: 'system-ui, sans-serif' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600 }}>Parler</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 600 }}>Bridge</h1>
         <p style={{ fontSize: 18, lineHeight: 1.6, color: '#333' }}>
           You already recognize thousands of French words — the ones ending in -tion, -able, -ent are nearly the same. This tutor won&apos;t give you answers. It will ask you questions until you build French yourself.
         </p>
